@@ -18,7 +18,7 @@ struct Color {
 struct Stars_3D {
     speed: i32,
     spread: i32,
-    stars_x: Vec<f32>,
+    stars_x: Vec<f32>, //TODO(dustin): do i need vec here? [f32] ..
     stars_y: Vec<f32>,
     stars_z: Vec<f32>
 }
@@ -52,7 +52,8 @@ impl Stars_3D {
         let color = Color{r:233, g:233, b:233};
         let halfWidth  = screen.get_width() as f32 / 2.0f32;
         let halfHeight = screen.get_height()as f32 / 2.0f32;
-        
+
+        //TODO(dustin):use idiomatic iterator
         for i in 0..self.stars_x.len() {
             self.stars_z[i] -= delta * self.speed as f32;
 
@@ -102,6 +103,7 @@ fn set_pixel(_x: i32, _y:i32, color: &Color, screen: &Surface) {
     });
 }
 
+//TODO(dustin): scan convert line - this is actually useless – prototyping
 fn draw_line(x0: i32, y0: i32, x1: i32, y1: i32, color: &Color, screen: &Surface) {
     for x in x0..x1 {
         // println!("{}", x);
@@ -114,7 +116,7 @@ fn draw_line(x0: i32, y0: i32, x1: i32, y1: i32, color: &Color, screen: &Surface
 
 fn main() {
     sdl::init(&[sdl::InitFlag::Video]);
-    sdl::wm::set_caption("rust-sdl demo - video", "rust-sdl");
+    sdl::wm::set_caption("pixelcannon", "rust-sdl");
 
     let mut rng = rand::thread_rng();
     let screen = match sdl::video::set_video_mode(1024, 768, 32,
@@ -135,7 +137,6 @@ fn main() {
     // draw_line(80, 40, 13, 20,  &color, &screen);
 
     let mut stars = Stars_3D::new(4000, 64, 20);
-
     let mut start = PreciseTime::now();
 
     'main : loop {
@@ -158,7 +159,6 @@ fn main() {
 
         stars.update_and_render(&screen, delta.num_milliseconds() as f32 / 1000f32);
         screen.flip();
-
     }
 
     sdl::quit();
