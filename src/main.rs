@@ -69,7 +69,7 @@ impl Stars_3D {
                 set_pixel(x as i32, y as i32, &color, &screen);
             }
         }
-	}
+    }
 }
 
 
