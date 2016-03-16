@@ -46,8 +46,7 @@ impl Stars_3D {
         self.stars_z[idx] = (rng.next_f32() + 0.00001) * (self.spread as f32);
     }
 
-    pub fn update_and_render(&mut self, screen: &Surface, delta: f32)
-	{
+    pub fn update_and_render(&mut self, screen: &Surface, delta: f32) {
         clear(screen);
 
         let color = Color{r:233, g:233, b:233};
