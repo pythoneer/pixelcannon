@@ -50,9 +50,9 @@ impl Stars_3D {
         clear(screen);
 
         let color = Color{r:233, g:233, b:233};
-
-		let halfWidth  = screen.get_width() as f32 / 2.0f32;
-		let halfHeight = screen.get_height()as f32 / 2.0f32;
+        let halfWidth  = screen.get_width() as f32 / 2.0f32;
+        let halfHeight = screen.get_height()as f32 / 2.0f32;
+        
         for i in 0..self.stars_x.len() {
             self.stars_z[i] -= delta * self.speed as f32;
 
