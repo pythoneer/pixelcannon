@@ -25,7 +25,12 @@ struct Stars_3D {
 
 impl Stars_3D {
     pub fn new(num_stars: usize, _spread: i32, _speed: i32) -> Stars_3D {
-        let mut obj = Stars_3D {spread: _spread, speed: _speed, stars_x: vec![0.0; num_stars], stars_y: vec![0.0; num_stars], stars_z: vec![0.0; num_stars] };
+        let mut obj = Stars_3D {
+            spread: _spread,
+            speed: _speed,
+            stars_x: vec![0.0; num_stars],
+            stars_y: vec![0.0; num_stars],
+            stars_z: vec![0.0; num_stars] };
 
         for idx in 0..num_stars {
             obj.init_star(idx);
