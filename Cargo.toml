@@ -4,6 +4,8 @@ version = "0.1.0"
 authors = ["Dustin Bensing <dustin.bensing@googlemail.com>"]
 
 [dependencies]
-sdl = "0.3.6"
+# sdl = "0.3.6"
+orbclient = "0.1.6"
+
 rand = "0.3"
 time = "0.1"
