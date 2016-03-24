@@ -1,8 +1,8 @@
 extern crate orbclient;
-extern crate time;
 
 use orbclient::window::EventIter;
-use time::PreciseTime;
+
+use std::time::Instant;
 
 struct RenderContext {
     window: Box<orbclient::Window>,
@@ -11,7 +11,7 @@ struct RenderContext {
 
 impl RenderContext {
     pub fn new(width: u32, height: u32, title: &str) -> RenderContext {
-        let orb_window = orbclient::Window::new_flags(0, 0, width, height, title, true).unwrap();
+        let orb_window = orbclient::Window::new_flags(100, 100, width, height, title, true).unwrap();
         RenderContext{scan_buffer: vec![0; (height * 2) as usize], window: orb_window}
     }
 
@@ -49,16 +49,16 @@ impl RenderContext {
 fn main() {
 
     let mut render_context = RenderContext::new(500, 400, "pixelcannon");
-    let mut start = PreciseTime::now();
+    let mut start = Instant::now();
 
     'event: loop {
 
         {
-            let end = PreciseTime::now();
-            let delta = start.to(end);
-            start = PreciseTime::now();
+            let end = Instant::now();
+            let delta = end.duration_since(start);
+            start = Instant::now();
 
-            println!("{} ms", delta.num_milliseconds());
+            println!("{} ms", delta.as_secs() * 1000 + (delta.subsec_nanos() as u64)/1000000);
 
             render_context.clear();
             for scan in 100..200 {
