@@ -5,4 +5,3 @@ authors = ["Dustin Bensing <dustin.bensing@googlemail.com>"]
 
 [dependencies]
 orbclient = "0.1.6"
-time = "0.1"
