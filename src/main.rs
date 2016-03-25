@@ -9,6 +9,18 @@ struct Vertex {
     y: f32
 }
 
+impl Vertex {
+    pub fn calc_area(&self, v1: &Vertex, v2: &Vertex) -> f32 {
+
+        let x1 = v1.x - self.x;
+        let y1 = v1.y - self.y;
+        let x2 = v2.x - self.x;
+        let y2 = v2.y - self.y;
+
+        (x1 * y2 - x2 * y1)
+    }
+}
+
 struct RenderContext {
     window: Box<orbclient::Window>,
     scan_buffer: Vec<u32> //TODO(dustin): do i need Vec<32> here? [i32]
@@ -32,7 +44,37 @@ impl RenderContext {
         self.window.sync();
     }
 
-    pub fn fill_convex_shape(&mut self, y_min: u32, y_max: u32) {
+    pub fn draw_triangle(&mut self, v1: &Vertex, v2: &Vertex, v3: &Vertex) {
+
+        let mut min_vert = &v1;
+        let mut mid_vert = &v2;
+        let mut max_vert = &v3;
+
+        if max_vert.y < mid_vert.y {
+            let tmp = max_vert;
+            max_vert = mid_vert;
+            mid_vert = tmp;
+        }
+
+        if mid_vert.y < min_vert.y {
+            let tmp = mid_vert;
+            mid_vert = min_vert;
+            min_vert = tmp;
+        }
+
+        if max_vert.y < mid_vert.y {
+            let tmp = max_vert;
+            max_vert = mid_vert;
+            mid_vert = tmp;
+        }
+
+        let area = min_vert.calc_area(&max_vert, &mid_vert);
+        let side = if area >= 0f32 { 1 } else { 0 };
+        self.convert_triangle(&min_vert, &mid_vert, &max_vert, side);
+        self.fill_convex_shape(min_vert.y as u32, max_vert.y as u32);
+    }
+
+    fn fill_convex_shape(&mut self, y_min: u32, y_max: u32) {
 
         for y_idx in y_min..y_max {
             let x_min = self.scan_buffer.get((y_idx * 2) as usize).unwrap().clone();
@@ -44,7 +86,7 @@ impl RenderContext {
         }
     }
 
-    pub fn convert_triangle(&mut self, min_vert: &Vertex, mid_vert: &Vertex, max_vert: &Vertex, side: i32) {
+    fn convert_triangle(&mut self, min_vert: &Vertex, mid_vert: &Vertex, max_vert: &Vertex, side: i32) {
 		self.convert_line(min_vert, max_vert, 0 + side);
 		self.convert_line(min_vert, mid_vert, 1 - side);
 		self.convert_line(mid_vert, max_vert, 1 - side);
@@ -93,8 +135,7 @@ fn main() {
             // println!("{} ms", delta_ms);
 
             render_context.clear();
-            render_context.convert_triangle(&min_vert, &mid_vert, &max_vert, 0);
-            render_context.fill_convex_shape(50, 300);
+            render_context.draw_triangle(&max_vert, &mid_vert, &min_vert);
             render_context.sync();
         }
 
