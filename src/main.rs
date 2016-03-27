@@ -4,6 +4,53 @@ use orbclient::window::EventIter;
 
 use std::time::Instant;
 
+// copyright by ticky i guess https://github.com/Ticki/sinulation/blob/master/src/lib.rs
+const PI: f32 = 3.141592653589793;
+
+pub trait Trig {
+    fn sinT(self) -> Self;
+    fn cosT(self) -> Self;
+    fn tanT(self) -> Self;
+}
+
+impl Trig for f32 {
+    fn sinT(mut self) -> f32 {
+        fn sin_imp(x: f32) -> f32 {
+            x - x * x * x / 6.0 + x * x * x * x * x / 120.0 - x * x * x * x * x * x * x / 5040.0 // + x * x * x * x * x * x * x * x * x / 362880.0
+        }
+
+        // self = self % (2.0 * PI);
+        // a % b = a - (b * int(a/b))
+        self = self - ((2.0 * PI) * ((self/(2.0 * PI as f32)) as i32) as f32);
+
+        if self < 0.0 {
+            -(-self).sin()
+        } else if self < PI / 2.0 {
+            sin_imp(self)
+        } else if self < PI {
+            1.0 - sin_imp(self -  PI / 2.0)
+        } else if self < 3.0 / 2.0 * PI {
+            -sin_imp(self - PI)
+        } else {
+            sin_imp(self - 3.0 / 2.0 * PI) + 1.0
+        }
+    }
+
+    fn cosT(self) -> f32 {
+        (self + PI / 2.0).sinT()
+    }
+
+    fn tanT(self) -> f32 {
+        self.sinT() / self.cosT()
+    }
+
+}
+// https://github.com/Ticki/sinulation/blob/master/src/lib.rs
+
+pub fn to_radians(degree: f32) -> f32 {
+    degree * 0.01745329252
+}
+
 struct Matrix4f32 {
     pub m: [[f32; 4]; 4]
 }
@@ -14,7 +61,7 @@ impl Matrix4f32 {
     }
 
     pub fn init_perspective(&mut self, fov: f32, aspect_ratio: f32, z_near: f32, z_far: f32) -> &mut Matrix4f32 {
-        let tan_half_fov = (fov / 2f32).tan();
+        let tan_half_fov = (fov / 2f32).tanT();
         let z_range = z_near - z_far;
 
         self.m[0][0] = 1f32 / (tan_half_fov * aspect_ratio);      self.m[0][1] = 0f32;                      self.m[0][2] = 0f32;                            self.m[0][3] = 0f32;
@@ -40,19 +87,19 @@ impl Matrix4f32 {
         let mut ry = Matrix4f32::new();
         let mut rz = Matrix4f32::new();
 
-        rz.m[0][0] = z.cos();   rz.m[0][1] = -z.sin();  rz.m[0][2] = 0f32;      rz.m[0][3] = 0f32;
-        rz.m[1][0] = z.sin();   rz.m[1][1] = z.cos();   rz.m[1][2] = 0f32;      rz.m[1][3] = 0f32;
+        rz.m[0][0] = z.cosT();   rz.m[0][1] = -z.sinT();  rz.m[0][2] = 0f32;      rz.m[0][3] = 0f32;
+        rz.m[1][0] = z.sinT();   rz.m[1][1] = z.cosT();   rz.m[1][2] = 0f32;      rz.m[1][3] = 0f32;
         rz.m[2][0] = 0f32;      rz.m[2][1] = 0f32;      rz.m[2][2] = 1f32;      rz.m[2][3] = 0f32;
         rz.m[3][0] = 0f32;      rz.m[3][1] = 0f32;      rz.m[3][2] = 0f32;      rz.m[3][3] = 1f32;
 
         rx.m[0][0] = 1f32;      rx.m[0][1] = 0f32;      rx.m[0][2] = 0f32;      rx.m[0][3] = 0f32;
-        rx.m[1][0] = 0f32;      rx.m[1][1] = x.cos();   rx.m[1][2] = -x.sin();  rx.m[1][3] = 0f32;
-        rx.m[2][0] = 0f32;      rx.m[2][1] = x.sin();   rx.m[2][2] = x.cos();   rx.m[2][3] = 0f32;
+        rx.m[1][0] = 0f32;      rx.m[1][1] = x.cosT();   rx.m[1][2] = -x.sinT();  rx.m[1][3] = 0f32;
+        rx.m[2][0] = 0f32;      rx.m[2][1] = x.sinT();   rx.m[2][2] = x.cosT();   rx.m[2][3] = 0f32;
         rx.m[3][0] = 0f32;      rx.m[3][1] = 0f32;      rx.m[3][2] = 0f32;      rx.m[3][3] = 1f32;
 
-        ry.m[0][0] = y.cos();   ry.m[0][1] = 0f32;      ry.m[0][2] = -y.sin();  ry.m[0][3] = 0f32;
+        ry.m[0][0] = y.cosT();   ry.m[0][1] = 0f32;      ry.m[0][2] = -y.sinT();  ry.m[0][3] = 0f32;
         ry.m[1][0] = 0f32;      ry.m[1][1] = 1f32;      ry.m[1][2] = 0f32;      ry.m[1][3] = 0f32;
-        ry.m[2][0] = y.sin();   ry.m[2][1] = 0f32;      ry.m[2][2] = y.cos();   ry.m[2][3] = 0f32;
+        ry.m[2][0] = y.sinT();   ry.m[2][1] = 0f32;      ry.m[2][2] = y.cosT();   ry.m[2][3] = 0f32;
         ry.m[3][0] = 0f32;      ry.m[3][1] = 0f32;      ry.m[3][2] = 0f32;      ry.m[3][3] = 1f32;
 
         self.m = rz.mul(&ry.mul(&rx)).m;
@@ -252,7 +299,7 @@ fn main() {
     let max_vert = Vertex::new( 1f32, -1f32, 0f32);
 
     let mut inter = Matrix4f32::new();//TODO(dustin): fix this
-    let projection = inter.init_perspective(70.0f32.to_radians(), render_context.get_width() as f32 / render_context.get_height() as f32, 0.1f32, 1000f32);
+    let projection = inter.init_perspective(to_radians(70.0f32), render_context.get_width() as f32 / render_context.get_height() as f32, 0.1f32, 1000f32);
 
     let mut rot_cnt = 0.0f32;
 
@@ -267,7 +314,7 @@ fn main() {
 
             rot_cnt += delta_ms as f32;
             let mut inter2 = Matrix4f32::new();//TODO(dustin): fix this
-            let translation = inter2.init_translation(0.0f32, 0.0f32, 3.0f32 + rot_cnt.sin());
+            let translation = inter2.init_translation(0.0f32, 0.0f32, 5.0f32 + rot_cnt.sinT() * 2f32);
             let mut inter3 = Matrix4f32::new();//TODO(dustin): fix this
             let rotation = inter3.init_rotation(rot_cnt, rot_cnt, 0.0f32);
             let transform = &projection.mul(&translation.mul(&rotation));
