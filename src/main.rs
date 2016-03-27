@@ -24,7 +24,7 @@ impl Trig for f32 {
         self = self - ((2.0 * PI) * ((self/(2.0 * PI as f32)) as i32) as f32);
 
         if self < 0.0 {
-            -(-self).sin()
+            -(-self).sinT()
         } else if self < PI / 2.0 {
             sin_imp(self)
         } else if self < PI {
@@ -314,7 +314,7 @@ fn main() {
 
             rot_cnt += delta_ms as f32;
             let mut inter2 = Matrix4f32::new();//TODO(dustin): fix this
-            let translation = inter2.init_translation(0.0f32, 0.0f32, 5.0f32 + rot_cnt.sinT() * 2f32);
+            let translation = inter2.init_translation(0.0f32, 0.0f32, 5.0f32/* + rot_cnt.sinT() * 2f32*/);
             let mut inter3 = Matrix4f32::new();//TODO(dustin): fix this
             let rotation = inter3.init_rotation(rot_cnt, rot_cnt, 0.0f32);
             let transform = &projection.mul(&translation.mul(&rotation));
