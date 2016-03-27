@@ -4,7 +4,7 @@ use orbclient::window::EventIter;
 
 use std::time::Instant;
 
-// copyright by ticky i guess https://github.com/Ticki/sinulation/blob/master/src/lib.rs
+// copyright by Ticki i guess https://github.com/Ticki/sinulation/blob/master/src/lib.rs
 const PI: f32 = 3.141592653589793;
 
 pub trait Trig {
