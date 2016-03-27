@@ -160,7 +160,7 @@ impl RenderContext {
     }
 
     pub fn clear(&mut self) {
-        self.window.set(orbclient::Color { data: 0xFF000000 });
+        self.window.set(orbclient::Color { data: 0xFF220CE8 });
     }
 
     pub fn sync(&mut self) {
@@ -207,7 +207,7 @@ impl RenderContext {
             let x_max = self.scan_buffer.get((y_idx * 2 + 1) as usize).unwrap().clone();
 
             for x_idx in x_min..x_max {
-                self.window.pixel(x_idx, y_idx, orbclient::Color { data: 0xFFFFFFFF });
+                self.window.pixel(x_idx, y_idx, orbclient::Color { data: 0xFFE8A90C });
             }
         }
     }
@@ -266,10 +266,10 @@ fn main() {
             // println!("{:?} ms", delta_ms);
 
             rot_cnt += delta_ms as f32;
-            let mut inter2 = Matrix4f32::new();
-            let translation = inter2.init_translation(0.0f32, 0.0f32, 3.0f32);
-            let mut inter3 = Matrix4f32::new();
-            let rotation = inter3.init_rotation(0.0f32, rot_cnt, 0.0f32);
+            let mut inter2 = Matrix4f32::new();//TODO(dustin): fix this
+            let translation = inter2.init_translation(0.0f32, 0.0f32, 3.0f32 + rot_cnt.sin());
+            let mut inter3 = Matrix4f32::new();//TODO(dustin): fix this
+            let rotation = inter3.init_rotation(rot_cnt, rot_cnt, 0.0f32);
             let transform = &projection.mul(&translation.mul(&rotation));
 
             render_context.clear();
