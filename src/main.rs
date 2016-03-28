@@ -4,53 +4,6 @@ use orbclient::window::EventIter;
 
 use std::time::Instant;
 
-// copyright by Ticki i guess https://github.com/Ticki/sinulation/blob/master/src/lib.rs
-// const PI: f32 = 3.141592653589793;
-//
-// pub trait Trig {
-//     fn sin_t(self) -> Self;
-//     fn cos_t(self) -> Self;
-//     fn tan_t(self) -> Self;
-// }
-//
-// impl Trig for f32 {
-//     fn sin_t(mut self) -> f32 {
-//         fn sin_imp(x: f32) -> f32 {
-//             x - x * x * x / 6.0 + x * x * x * x * x / 120.0 - x * x * x * x * x * x * x / 5040.0  + x * x * x * x * x * x * x * x * x / 362880.0
-//         }
-//
-//         // self = self % (2.0 * PI);
-//         // a % b = a - (b * int(a/b))
-//         self = self - ((2.0 * PI) * ((self/(2.0 * PI as f32)) as i32) as f32);
-//
-//         if self < 0.0 {
-//             -(-self).sin_t()
-//         } else if self < PI / 2.0 {
-//             sin_imp(self)
-//         } else if self < PI {
-//             1.0 - sin_imp(self -  PI / 2.0)
-//         } else if self < 3.0 / 2.0 * PI {
-//             -sin_imp(self - PI)
-//         } else {
-//             sin_imp(self - 3.0 / 2.0 * PI) - 1.0
-//         }
-//     }
-//
-//     fn cos_t(self) -> f32 {
-//         (self + PI / 2.0).sin_t()
-//     }
-//
-//     fn tan_t(self) -> f32 {
-//         self.sin_t() / self.cos_t()
-//     }
-//
-// }
-// https://github.com/Ticki/sinulation/blob/master/src/lib.rs
-
-pub fn to_radians(degree: f32) -> f32 {
-    degree * 0.01745329252
-}
-
 struct Matrix4f32 {
     pub m: [[f32; 4]; 4]
 }
