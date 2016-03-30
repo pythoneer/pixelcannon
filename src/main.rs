@@ -136,15 +136,42 @@ impl Vertex {
 
 }
 
+struct Edge {
+    pos_x: f32,
+    step_x: f32,
+    start_y: i32,
+    end_y: i32
+}
+
+impl Edge {
+    pub fn new(min_vert: &Vertex, max_vert: &Vertex) -> Edge {
+
+        let dist_y = max_vert.pos.y - min_vert.pos.y;
+        let dist_x = max_vert.pos.x - min_vert.pos.x;
+        let prestep_y = min_vert.pos.y.ceil() - min_vert.pos.y;
+        let _step_x = dist_x as f32 / dist_y as f32;
+
+        Edge {
+            pos_x: min_vert.pos.x + prestep_y * _step_x,
+            step_x: _step_x,
+            start_y: min_vert.pos.y.ceil() as i32,
+            end_y: max_vert.pos.y.ceil() as i32,
+        }
+    }
+
+    pub fn step(&mut self) {
+        self.pos_x += self.step_x;
+    }
+}
+
 struct RenderContext {
     window: Box<orbclient::Window>,
-    scan_buffer: Vec<i32> //TODO(dustin): do i need Vec<32> here? [i32]
 }
 
 impl RenderContext {
     pub fn new(width: u32, height: u32, title: &str) -> RenderContext {
         let orb_window = orbclient::Window::new_flags(100, 100, width, height, title, true).unwrap();
-        RenderContext{scan_buffer: vec![0; (height * 2) as usize], window: orb_window}
+        RenderContext{window: orb_window}
     }
 
     pub fn get_height(&self) -> u32 {
@@ -176,67 +203,55 @@ impl RenderContext {
         let mut max_vert = v3.transform(&screen_space_transform).perspective_divide();
 
         if max_vert.pos.y < mid_vert.pos.y {
-            let tmp = max_vert;
-            max_vert = mid_vert;
-            mid_vert = tmp;
+            std::mem::swap(&mut mid_vert, &mut max_vert);
         }
 
         if mid_vert.pos.y < min_vert.pos.y {
-            let tmp = mid_vert;
-            mid_vert = min_vert;
-            min_vert = tmp;
+            std::mem::swap(&mut mid_vert, &mut min_vert);
         }
 
         if max_vert.pos.y < mid_vert.pos.y {
-            let tmp = max_vert;
-            max_vert = mid_vert;
-            mid_vert = tmp;
+            std::mem::swap(&mut max_vert, &mut mid_vert);
         }
 
-        let area = min_vert.calc_double_area(&max_vert, &mid_vert);
-        let side = if area >= 0 { 1 } else { 0 };
-        self.convert_triangle(&min_vert, &mid_vert, &max_vert, side);
-        self.fill_convex_shape(min_vert.pos.y.ceil() as i32, max_vert.pos.y.ceil() as i32);
+        self.scan_triangle(&min_vert, &mid_vert, &max_vert, min_vert.calc_double_area(&max_vert, &mid_vert) >= 0);
     }
 
-    fn fill_convex_shape(&mut self, y_min: i32, y_max: i32) {
+    fn scan_triangle(&mut self,  min_vert: &Vertex, mid_vert: &Vertex, max_vert: &Vertex, side: bool) {
+        let mut top_to_bottom = Edge::new(min_vert, max_vert);
+        let mut top_to_middle = Edge::new(min_vert, mid_vert);
+        let mut middle_to_bottom = Edge::new(mid_vert, max_vert);
 
-        for y_idx in y_min..y_max {
-            let x_min = self.scan_buffer.get((y_idx * 2) as usize).unwrap().clone();
-            let x_max = self.scan_buffer.get((y_idx * 2 + 1) as usize).unwrap().clone();
-
-            for x_idx in x_min..x_max {
-                self.window.pixel(x_idx, y_idx, orbclient::Color { data: 0xFFE8A90C });
-            }
-        }
+        self.scan_edges(&mut top_to_bottom, &mut top_to_middle, side);
+        self.scan_edges(&mut top_to_bottom, &mut middle_to_bottom, side);
     }
 
-    fn convert_triangle(&mut self, min_vert: &Vertex, mid_vert: &Vertex, max_vert: &Vertex, side: i32) {
-        self.convert_line(min_vert, max_vert, 0 + side);
-        self.convert_line(min_vert, mid_vert, 1 - side);
-        self.convert_line(mid_vert, max_vert, 1 - side);
-    }
+    fn scan_edges(&mut self, first: &mut Edge, second: &mut Edge, side: bool) {
+        let start_y = second.start_y;
+        let end_y = second.end_y;
 
-    fn convert_line(&mut self, min_vert: &Vertex, max_vert: &Vertex, side: i32) {
-        let start_y = min_vert.pos.y.ceil();
-        let end_y = max_vert.pos.y.ceil();
-        let dist_y = max_vert.pos.y - min_vert.pos.y;
-        let dist_x = max_vert.pos.x - min_vert.pos.x;
+        let mut left = first;
+        let mut right = second;
 
-        if dist_y <= 0f32 {
-            return;
+        if side {
+            std::mem::swap(&mut left, &mut right);
         }
 
-        let step_x = dist_x as f32 / dist_y as f32;
-        let prestep_x = start_y - min_vert.pos.y;
-        let mut current_x = min_vert.pos.x + prestep_x * step_x;
-
-        for y_coord in start_y as i32..end_y as i32 {
-            self.scan_buffer[((y_coord * 2 + side) as usize)] = current_x.ceil() as i32;
-            current_x += step_x;
+        for idx_y in start_y ..end_y {
+            self.draw_scan_line(&left, &right, idx_y);
+            left.step();
+            right.step();
         }
     }
 
+    fn draw_scan_line(&mut self, left: &Edge, right: &Edge, idx_y: i32) {
+        let min_x = left.pos_x.ceil() as i32;
+        let max_x = right.pos_x.ceil()as i32;
+
+        for idx_x in min_x..max_x {
+            self.window.pixel(idx_x, idx_y, orbclient::Color { data: 0xFFE8A90C });
+        }
+    }
 }
 
 fn main() {
@@ -276,7 +291,7 @@ fn main() {
             frame_cnt += 1f32;
             counter_duration += delta_ms;
             if counter_duration > 1000f32 {
-                println!("FPS: {}", frame_cnt / counter_duration * 1000f32);
+                println!("FPSxx: {}", frame_cnt / counter_duration * 1000f32);
                 frame_cnt = 0f32;
                 counter_duration = 0f32;
             }
