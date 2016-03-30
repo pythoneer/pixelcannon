@@ -196,7 +196,7 @@ impl RenderContext {
         let area = min_vert.calc_double_area(&max_vert, &mid_vert);
         let side = if area >= 0 { 1 } else { 0 };
         self.convert_triangle(&min_vert, &mid_vert, &max_vert, side);
-        self.fill_convex_shape(min_vert.pos.y as i32, max_vert.pos.y as i32);
+        self.fill_convex_shape(min_vert.pos.y.ceil() as i32, max_vert.pos.y.ceil() as i32);
     }
 
     fn fill_convex_shape(&mut self, y_min: i32, y_max: i32) {
@@ -218,23 +218,21 @@ impl RenderContext {
     }
 
     fn convert_line(&mut self, min_vert: &Vertex, max_vert: &Vertex, side: i32) {
-        let start_y = min_vert.pos.y;
-        let start_x = min_vert.pos.x;
-        let end_y = max_vert.pos.y;
-        let end_x = max_vert.pos.x;
-
-        let dist_y = end_y - start_y;
-        let dist_x = end_x - start_x;
+        let start_y = min_vert.pos.y.ceil();
+        let end_y = max_vert.pos.y.ceil();
+        let dist_y = max_vert.pos.y - min_vert.pos.y;
+        let dist_x = max_vert.pos.x - min_vert.pos.x;
 
         if dist_y <= 0f32 {
             return;
         }
 
         let step_x = dist_x as f32 / dist_y as f32;
-        let mut current_x = start_x as f32;
+        let prestep_x = start_y - min_vert.pos.y;
+        let mut current_x = min_vert.pos.x + prestep_x * step_x;
 
         for y_coord in start_y as i32..end_y as i32 {
-            self.scan_buffer[((y_coord * 2 + side) as usize)] = current_x as i32;
+            self.scan_buffer[((y_coord * 2 + side) as usize)] = current_x.ceil() as i32;
             current_x += step_x;
         }
     }
