@@ -13,7 +13,7 @@ impl Matrix4f32 {
         Matrix4f32{m: [[0f32; 4]; 4]}
     }
 
-    pub fn init_perspective(&mut self, fov: f32, aspect_ratio: f32, z_near: f32, z_far: f32) -> &mut Matrix4f32 {
+    pub fn init_perspective(mut self, fov: f32, aspect_ratio: f32, z_near: f32, z_far: f32) -> Matrix4f32 {
         let tan_half_fov = (fov / 2f32).tan();
         let z_range = z_near - z_far;
 
@@ -25,7 +25,7 @@ impl Matrix4f32 {
         self
     }
 
-    pub fn init_translation(&mut self, x: f32, y: f32, z: f32) -> &mut Matrix4f32 {
+    pub fn init_translation(mut self, x: f32, y: f32, z: f32) -> Matrix4f32 {
         self.m[0][0] = 1f32;    self.m[0][1] = 0f32;    self.m[0][2] = 0f32;    self.m[0][3] = x;
         self.m[1][0] = 0f32;    self.m[1][1] = 1f32;    self.m[1][2] = 0f32;    self.m[1][3] = y;
         self.m[2][0] = 0f32;    self.m[2][1] = 0f32;    self.m[2][2] = 1f32;    self.m[2][3] = z;
@@ -34,7 +34,7 @@ impl Matrix4f32 {
         self
     }
 
-    pub fn init_rotation(&mut self, x: f32, y: f32, z: f32) -> &mut Matrix4f32 {
+    pub fn init_rotation(mut self, x: f32, y: f32, z: f32) -> Matrix4f32 {
 
         let mut rx = Matrix4f32::new();
         let mut ry = Matrix4f32::new();
@@ -60,7 +60,7 @@ impl Matrix4f32 {
         self
     }
 
-    pub fn init_sreenspace_transform(&mut self, half_width: f32, half_height: f32) -> &mut Matrix4f32 {
+    pub fn init_sreenspace_transform(mut self, half_width: f32, half_height: f32) -> Matrix4f32 {
         self.m[0][0] = half_width;  self.m[0][1] = 0f32;            self.m[0][2] = 0f32;    self.m[0][3] = half_width;
         self.m[1][0] = 0f32;        self.m[1][1] = -half_height;    self.m[1][2] = 0f32;    self.m[1][3] = half_height;
         self.m[2][0] = 0f32;        self.m[2][1] = 0f32;            self.m[2][2] = 1f32;    self.m[2][3] = 0f32;
@@ -169,12 +169,11 @@ impl RenderContext {
 
     pub fn draw_triangle(&mut self, v1: &Vertex, v2: &Vertex, v3: &Vertex) {
 
-        let mut inter = Matrix4f32::new(); //TODO(dustin): fix this
-        let screen_space_transform = inter.init_sreenspace_transform(self.get_width() as f32 / 2f32, self.get_height() as f32 / 2f32);
+        let screen_space_transform = Matrix4f32::new().init_sreenspace_transform(self.get_width() as f32 / 2f32, self.get_height() as f32 / 2f32);
 
-        let mut min_vert = v1.transform(screen_space_transform).perspective_divide();
-        let mut mid_vert = v2.transform(screen_space_transform).perspective_divide();
-        let mut max_vert = v3.transform(screen_space_transform).perspective_divide();
+        let mut min_vert = v1.transform(&screen_space_transform).perspective_divide();
+        let mut mid_vert = v2.transform(&screen_space_transform).perspective_divide();
+        let mut max_vert = v3.transform(&screen_space_transform).perspective_divide();
 
         if max_vert.pos.y < mid_vert.pos.y {
             let tmp = max_vert;
@@ -251,8 +250,7 @@ fn main() {
     let mid_vert = Vertex::new( 0f32,  1f32, 0f32);
     let max_vert = Vertex::new( 1f32, -1f32, 0f32);
 
-    let mut inter = Matrix4f32::new();//TODO(dustin): fix this
-    let projection = inter.init_perspective(70.0f32.to_radians(), render_context.get_width() as f32 / render_context.get_height() as f32, 0.1f32, 1000f32);
+    let projection = Matrix4f32::new().init_perspective(70.0f32.to_radians(), render_context.get_width() as f32 / render_context.get_height() as f32, 0.1f32, 1000f32);
 
     let mut rot_cnt = 0f32;
 
@@ -269,10 +267,8 @@ fn main() {
             // println!("{:?} ms", delta_ms);
 
             rot_cnt += delta_ms / 1000f32;
-            let mut inter2 = Matrix4f32::new();//TODO(dustin): fix this
-            let translation = inter2.init_translation(0.0f32, 0.0f32, 4.3f32 + rot_cnt.sin() * 2f32);
-            let mut inter3 = Matrix4f32::new();//TODO(dustin): fix this
-            let rotation = inter3.init_rotation(rot_cnt, rot_cnt, 0.0f32);
+            let translation = Matrix4f32::new().init_translation(0.0f32, 0.0f32, 4.3f32 + rot_cnt.sin() * 2f32);
+            let rotation = Matrix4f32::new().init_rotation(rot_cnt, rot_cnt, 0.0f32);
             let transform = &projection.mul(&translation.mul(&rotation));
 
             render_context.clear();
