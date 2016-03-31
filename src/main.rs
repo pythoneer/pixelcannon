@@ -200,14 +200,15 @@ impl RenderContext {
     }
 
     fn fill_convex_shape(&mut self, y_min: i32, y_max: i32) {
-
         for y_idx in y_min..y_max {
             let x_min = self.scan_buffer.get((y_idx * 2) as usize).unwrap().clone();
             let x_max = self.scan_buffer.get((y_idx * 2 + 1) as usize).unwrap().clone();
 
-            for x_idx in x_min..x_max {
-                self.window.pixel(x_idx, y_idx, orbclient::Color { data: 0xFFE8A90C });
-            }
+            if x_max >= x_min {
+                self.window.rect(x_min, y_idx, (x_max - x_min) as u32, 1, orbclient::Color { data: 0xFFE8A90C });
+            }/* else {
+                println!("fill_convex_shape: x_max >= x_min not true: {} < {}", x_max, x_min);
+            }*/
         }
     }
 
