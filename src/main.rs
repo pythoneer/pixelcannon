@@ -237,7 +237,7 @@ impl RenderContext {
             std::mem::swap(&mut left, &mut right);
         }
 
-        for idx_y in start_y ..end_y {
+        for idx_y in start_y..end_y {
             self.draw_scan_line(&left, &right, idx_y);
             left.step();
             right.step();
