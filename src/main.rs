@@ -274,7 +274,7 @@ impl Interpolator {
 
     fn calc_step_x(values: [f32; 3], min_vert: &Vertex, mid_vert: &Vertex, max_vert: &Vertex, one_over_dx: f32) -> f32 {
         let val =   (((values[1] - values[2]) *
-                    min_vert.pos.y - max_vert.pos.y) -
+                    (min_vert.pos.y - max_vert.pos.y)) -
                     ((values[0] - values[2]) *
                     (mid_vert.pos.y - max_vert.pos.y))) * one_over_dx;
 
@@ -283,7 +283,7 @@ impl Interpolator {
 
     fn calc_step_y(values: [f32; 3], min_vert: &Vertex, mid_vert: &Vertex, max_vert: &Vertex, one_over_dy: f32) -> f32 {
         let val =   (((values[1] - values[2]) *
-                    min_vert.pos.x - max_vert.pos.x) -
+                    (min_vert.pos.x - max_vert.pos.x)) -
                     ((values[0] - values[2]) *
                     (mid_vert.pos.x - max_vert.pos.x))) * one_over_dy;
 
@@ -303,7 +303,7 @@ impl BitmapTexture {
         BitmapTexture {
             width: _width,
             height: _height,
-            data: vec![0; (_width * _height) as usize]
+            data: vec![0_u8; (_width * _height * 4) as usize]
         }
     }
 
@@ -316,16 +316,16 @@ impl BitmapTexture {
         self.data[idx + 3] = b;
     }
 
-    pub fn copy_pixel_from_texture(&mut self, dest_x: i32, dest_y: i32, src_x: i32, src_y: i32, texture: &BitmapTexture) {
-
-        let dest_idx = ((dest_x + dest_y * self.width) * 4) as usize;
-        let src_idx = ((src_x + src_y * texture.width) * 4) as usize;
-
-        self.data[dest_idx    ] = texture.data[src_idx];
-        self.data[dest_idx + 1] = texture.data[src_idx + 1];
-        self.data[dest_idx + 2] = texture.data[src_idx + 2];
-        self.data[dest_idx + 3] = texture.data[src_idx + 3];
-    }
+    // pub fn copy_pixel_from_texture(&mut self, dest_x: i32, dest_y: i32, src_x: i32, src_y: i32, texture: &BitmapTexture) {
+    //
+    //     let dest_idx = ((dest_x + dest_y * self.width) * 4) as usize;
+    //     let src_idx = ((src_x + src_y * texture.width) * 4) as usize;
+    //
+    //     self.data[dest_idx    ] = texture.data[src_idx];
+    //     self.data[dest_idx + 1] = texture.data[src_idx + 1];
+    //     self.data[dest_idx + 2] = texture.data[src_idx + 2];
+    //     self.data[dest_idx + 3] = texture.data[src_idx + 3];
+    // }
 
     // pub fn copy_to_byte_array(& self, &mut)
 }
@@ -425,37 +425,54 @@ impl RenderContext {
         let tex_coords_step_yx = (right.tex_coords_y - left.tex_coords_y) / dist_x;
         let one_over_step_zx = (right.one_over_z - left.one_over_z) / dist_x;
 
-        let tex_coords_x = left.tex_coords_x + tex_coords_step_xx * prestep_x;
-        let tex_coords_y = left.tex_coords_y + tex_coords_step_yx * prestep_x;
-        let one_over_z = left.one_over_z + one_over_step_zx + one_over_step_zx * prestep_x;
+        let mut tex_coords_x = left.tex_coords_x + tex_coords_step_xx * prestep_x;
+        let mut tex_coords_y = left.tex_coords_y + tex_coords_step_yx * prestep_x;
+        let mut one_over_z = left.one_over_z + one_over_step_zx * prestep_x;
 
         for idx_x in min_x..max_x {
             let z = 1_f32 / one_over_z;
-            let src_x = ((tex_coords_x * z) * (texture.width as f32 - 1_f32) + 0.5_f32) as i32;
-            let src_y = ((tex_coords_y * z) * (texture.height as f32 - 1_f32) + 0.5_f32) as i32;
+            let src_x = ((tex_coords_x * z) * (texture.width - 1) as f32 + 0.5_f32) as i32;
+            let src_y = ((tex_coords_y * z) * (texture.height - 1) as f32 + 0.5_f32) as i32;
+            let tex_idx = ((src_x + src_y * texture.width) * 4) as usize;
 
-            self.window.pixel(idx_x, idx_y, orbclient::Color { data: 0xFFE8A90C });
+            let a = texture.data[tex_idx];
+            let r = texture.data[tex_idx + 1];
+            let g = texture.data[tex_idx + 2];
+            let b = texture.data[tex_idx + 3];
+
+            let color = ((a as u32) << 24) + ((r as u32) << 16) + ((g as u32) << 8) + b as u32;
+
+            self.window.pixel(idx_x, idx_y, orbclient::Color { data: color });
+
+            one_over_z += one_over_step_zx;
+            tex_coords_x += tex_coords_step_xx;
+            tex_coords_y += tex_coords_step_yx;
         }
-
-
-        // for idx_x in min_x..max_x {
-        //     self.window.pixel(idx_x, idx_y, orbclient::Color { data: 0xFFE8A90C });
-        // }
     }
 }
 
 fn main() {
 
-    let mut render_context = RenderContext::new(500, 400, "pixelcannon");
+    let mut render_context = RenderContext::new(800, 600, "pixelcannon");
     let mut start = Instant::now();
 
     let min_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x:-1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0_f32, y:0_f32, z:0_f32, w:0_f32});
-    let mid_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x:-0_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0.5_f32, y:1_f32, z:0_f32, w:0_f32});
-    let max_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x:1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:1_f32, y:0_f32, z:0_f32, w:0_f32});
+    let mid_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x: 0_f32, y: 1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0.5_f32, y:1_f32, z:0_f32, w:0_f32});
+    let max_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x: 1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:1_f32, y:0_f32, z:0_f32, w:0_f32});
 
     let projection = Matrix4f32::new().init_perspective(70.0_f32.to_radians(), render_context.get_width() as f32 / render_context.get_height() as f32, 0.1_f32, 1000_f32);
 
-    let texture = BitmapTexture::new(32, 32);
+
+    let mut texture = BitmapTexture::new(32, 32);
+    for x in 0..texture.width {
+        for y in 0..texture.height {
+            let r = (x*5) as u8;
+            let g = (y*6) as u8;
+            let b = (x+y*3) as u8;
+            texture.set_pixel(x, y, 255, r, g, b);
+        }
+    }
+
 
     let mut rot_cnt = 0_f32;
 
@@ -471,10 +488,16 @@ fn main() {
             start = Instant::now();
             // println!("{:?} ms", delta_ms);
 
+            // let delta_ms = 100_f32;
+
             rot_cnt += delta_ms / 1000_f32;
             let translation = Matrix4f32::new().init_translation(0.0_f32, 0.0_f32, 4.3_f32 + rot_cnt.sin() * 2_f32);
             let rotation = Matrix4f32::new().init_rotation(rot_cnt, rot_cnt, 0.0_f32);
             let transform = &projection.mul(&translation.mul(&rotation));
+
+            // let translation = Matrix4f32::new().init_translation(0.0_f32, 0.0_f32, 3_f32);
+            // let rotation = Matrix4f32::new().init_rotation(rot_cnt, rot_cnt, rot_cnt);
+            // let transform = &projection.mul(&translation.mul(&rotation));
 
             render_context.clear();
             render_context.draw_triangle(&min_vert.transform(&transform), &mid_vert.transform(&transform), &max_vert.transform(&transform), &texture);
@@ -483,7 +506,7 @@ fn main() {
             frame_cnt += 1_f32;
             counter_duration += delta_ms;
             if counter_duration > 1000_f32 {
-                println!("FPSxx: {}", frame_cnt / counter_duration * 1000_f32);
+                println!("FPS: {}", frame_cnt / counter_duration * 1000_f32);
                 frame_cnt = 0_f32;
                 counter_duration = 0_f32;
             }

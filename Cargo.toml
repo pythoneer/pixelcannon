@@ -4,4 +4,4 @@ version = "0.1.0"
 authors = ["Dustin Bensing <dustin.bensing@googlemail.com>"]
 
 [dependencies]
-orbclient = "0.1.6"
+orbclient = "*"
