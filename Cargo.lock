@@ -3,11 +3,17 @@ name = "renderer"
 version = "0.1.0"
 dependencies = [
  "orbclient 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "orbimage 0.1.0 (git+https://github.com/redox-os/orbimage.git)",
 ]
 
 [[package]]
 name = "bitflags"
 version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "gcc"
+version = "0.3.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -19,6 +25,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "libc"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "libz-sys"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "gcc 0.3.28 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "pkg-config 0.3.8 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "num"
@@ -35,6 +51,38 @@ version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "sdl2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "orbimage"
+version = "0.1.0"
+source = "git+https://github.com/redox-os/orbimage.git#bbe01ece496f9d67681d07541554a874ed3791d4"
+dependencies = [
+ "orbclient 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
+ "png 0.1.0 (git+https://github.com/servo/rust-png.git)",
+]
+
+[[package]]
+name = "pkg-config"
+version = "0.3.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "png"
+version = "0.1.0"
+source = "git+https://github.com/servo/rust-png.git#b8c2bf074719e5a39b9e4423989f5f06fa79317d"
+dependencies = [
+ "gcc 0.3.28 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "png-sys 1.6.16 (git+https://github.com/servo/rust-png.git)",
+]
+
+[[package]]
+name = "png-sys"
+version = "1.6.16"
+source = "git+https://github.com/servo/rust-png.git#b8c2bf074719e5a39b9e4423989f5f06fa79317d"
+dependencies = [
+ "libz-sys 0.1.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

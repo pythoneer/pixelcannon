@@ -1,6 +1,8 @@
 extern crate orbclient;
+extern crate orbimage;
 
 use orbclient::window::EventIter;
+use orbimage::Image;
 
 use std::time::Instant;
 
@@ -298,6 +300,7 @@ struct BitmapTexture {
     data: Vec<u8>
 }
 
+//TODO:(dustin) use orbclient color format, avoid expensive conversation
 impl BitmapTexture {
     pub fn new(_width: i32, _height: i32) -> BitmapTexture {
         BitmapTexture {
@@ -316,6 +319,42 @@ impl BitmapTexture {
         self.data[idx + 3] = b;
     }
 
+    pub fn get_pixel(&self, x: i32, y: i32) -> (u8, u8, u8, u8) {
+        let tex_idx = ((x + y * self.width) * 4) as usize;
+
+        let a = self.data[tex_idx];
+        let r = self.data[tex_idx + 1];
+        let g = self.data[tex_idx + 2];
+        let b = self.data[tex_idx + 3];
+
+        (a, r, g, b)
+    }
+
+    pub fn get_orb_pixel(&self, x: i32, y: i32) -> orbclient::Color {
+        let (a, r, g, b) = self.get_pixel(x, y);
+        let color = ((a as u32) << 24) + ((r as u32) << 16) + ((g as u32) << 8) + b as u32;
+
+        orbclient::Color { data: color }
+    }
+
+    pub fn from_orbimage(image: &Image) -> BitmapTexture {
+        let mut texture = BitmapTexture::new(image.width() as i32, image.height() as i32);
+
+        for x in 0..texture.width {
+            for y in 0..texture.height {
+
+                let col_idx = (x + y * image.width() as i32) as usize;
+                let orb_color = image.data()[col_idx];
+
+                let r = (orb_color.data >> 16) as u8;
+                let g = (orb_color.data >> 8) as u8;
+                let b = orb_color.data as u8;
+                texture.set_pixel(x, y, 255, r, g, b);
+            }
+        }
+
+        texture
+    }
     // pub fn copy_pixel_from_texture(&mut self, dest_x: i32, dest_y: i32, src_x: i32, src_y: i32, texture: &BitmapTexture) {
     //
     //     let dest_idx = ((dest_x + dest_y * self.width) * 4) as usize;
@@ -433,16 +472,8 @@ impl RenderContext {
             let z = 1_f32 / one_over_z;
             let src_x = ((tex_coords_x * z) * (texture.width - 1) as f32 + 0.5_f32) as i32;
             let src_y = ((tex_coords_y * z) * (texture.height - 1) as f32 + 0.5_f32) as i32;
-            let tex_idx = ((src_x + src_y * texture.width) * 4) as usize;
 
-            let a = texture.data[tex_idx];
-            let r = texture.data[tex_idx + 1];
-            let g = texture.data[tex_idx + 2];
-            let b = texture.data[tex_idx + 3];
-
-            let color = ((a as u32) << 24) + ((r as u32) << 16) + ((g as u32) << 8) + b as u32;
-
-            self.window.pixel(idx_x, idx_y, orbclient::Color { data: color });
+            self.window.pixel(idx_x, idx_y, texture.get_orb_pixel(src_x, src_y));
 
             one_over_z += one_over_step_zx;
             tex_coords_x += tex_coords_step_xx;
@@ -462,17 +493,8 @@ fn main() {
 
     let projection = Matrix4f32::new().init_perspective(70.0_f32.to_radians(), render_context.get_width() as f32 / render_context.get_height() as f32, 0.1_f32, 1000_f32);
 
-
-    let mut texture = BitmapTexture::new(32, 32);
-    for x in 0..texture.width {
-        for y in 0..texture.height {
-            let r = (x*5) as u8;
-            let g = (y*6) as u8;
-            let b = (x+y*3) as u8;
-            texture.set_pixel(x, y, 255, r, g, b);
-        }
-    }
-
+    let image = Image::from_path("assets/img.png").unwrap();
+    let texture = BitmapTexture::from_orbimage(&image);
 
     let mut rot_cnt = 0_f32;
 
