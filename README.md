@@ -1,2 +1,3 @@
 # pixelcannon
-![pixelcannon](http://i.imgur.com/u2QgCZ1.gif)
+running on redox
+![pixelcannon](http://i.imgur.com/HuAFj15.gif)
