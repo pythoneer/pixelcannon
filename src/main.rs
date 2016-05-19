@@ -484,7 +484,7 @@ impl RenderContext {
 
 fn main() {
 
-    let mut render_context = RenderContext::new(800, 600, "pixelcannon");
+    let mut render_context = RenderContext::new(500, 400, "pixelcannon");
     let mut start = Instant::now();
 
     let min_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x:-1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0_f32, y:0_f32, z:0_f32, w:0_f32});
@@ -493,7 +493,12 @@ fn main() {
 
     let projection = Matrix4f32::new().init_perspective(70.0_f32.to_radians(), render_context.get_width() as f32 / render_context.get_height() as f32, 0.1_f32, 1000_f32);
 
-    let image = Image::from_path("assets/img.png").unwrap();
+    let mut basepath = "";
+    if cfg!(target_os = "redox") {
+        basepath = "/apps/pixelcannon/";
+    }
+
+    let image = Image::from_path(basepath.to_string() + "assets/img.png").unwrap();
     let texture = BitmapTexture::from_orbimage(&image);
 
     let mut rot_cnt = 0_f32;
