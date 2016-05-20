@@ -487,9 +487,19 @@ fn main() {
     let mut render_context = RenderContext::new(500, 400, "pixelcannon");
     let mut start = Instant::now();
 
-    let min_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x:-1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0_f32, y:0_f32, z:0_f32, w:0_f32});
-    let mid_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x: 0_f32, y: 1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0.5_f32, y:1_f32, z:0_f32, w:0_f32});
-    let max_vert = Vertex::new_with_pos_and_texcoords(Vector4f32{x: 1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:1_f32, y:0_f32, z:0_f32, w:0_f32});
+    let mut triangles = Vec::new();
+
+    triangles.push((
+        Vertex::new_with_pos_and_texcoords(Vector4f32{x:-1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0_f32, y:0_f32, z:0_f32, w:0_f32}),
+        Vertex::new_with_pos_and_texcoords(Vector4f32{x: 1_f32, y: 1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:1_f32, y:1_f32, z:0_f32, w:0_f32}),
+        Vertex::new_with_pos_and_texcoords(Vector4f32{x: 1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:1_f32, y:0_f32, z:0_f32, w:0_f32})
+    ));
+
+    triangles.push((
+        Vertex::new_with_pos_and_texcoords(Vector4f32{x:-1_f32, y:-1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0_f32, y:0_f32, z:0_f32, w:0_f32}),
+        Vertex::new_with_pos_and_texcoords(Vector4f32{x:-1_f32, y: 1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:0_f32, y:1_f32, z:0_f32, w:0_f32}),
+        Vertex::new_with_pos_and_texcoords(Vector4f32{x: 1_f32, y: 1_f32, z:0_f32, w: 1_f32}, Vector4f32{x:1_f32, y:1_f32, z:0_f32, w:0_f32})
+    ));
 
     let projection = Matrix4f32::new().init_perspective(70.0_f32.to_radians(), render_context.get_width() as f32 / render_context.get_height() as f32, 0.1_f32, 1000_f32);
 
@@ -527,7 +537,9 @@ fn main() {
             // let transform = &projection.mul(&translation.mul(&rotation));
 
             render_context.clear();
-            render_context.draw_triangle(&min_vert.transform(&transform), &mid_vert.transform(&transform), &max_vert.transform(&transform), &texture);
+            for &(ref min_vert, ref mid_vert, ref max_vert) in triangles.iter() {
+                render_context.draw_triangle(&min_vert.transform(&transform), &mid_vert.transform(&transform), &max_vert.transform(&transform), &texture);
+            }
             render_context.sync();
 
             frame_cnt += 1_f32;
