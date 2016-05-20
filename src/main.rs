@@ -1,3 +1,5 @@
+#![feature(step_by)]
+
 extern crate orbclient;
 extern crate orbimage;
 
@@ -5,6 +7,10 @@ use orbclient::window::EventIter;
 use orbimage::Image;
 
 use std::time::Instant;
+
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
 
 struct Matrix4f32 {
     pub m: [[f32; 4]; 4]
@@ -104,6 +110,43 @@ struct Vector4f32 {
     w: f32
 }
 
+impl Vector4f32 {
+
+    pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vector4f32 {
+        Vector4f32 {
+            x: x,
+            y: y,
+            z: z,
+            w: w
+        }
+    }
+
+    pub fn add_v(&self, other: &Vector4f32) -> Vector4f32 {
+        Vector4f32::new(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w)
+    }
+
+    pub fn sub_v(&self, other: &Vector4f32) -> Vector4f32 {
+        Vector4f32::new(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w)
+    }
+
+    pub fn length(&self) -> f32 {
+        ((self.x * self.x) + (self.y * self.y) + (self.z * self.z) + (self.w * self.w)).sqrt()
+    }
+
+    pub fn normalized(&self) -> Vector4f32 {
+        let length = self.length();
+        Vector4f32::new(self.x / length, self.y / length, self.z / length, self.w / length)
+    }
+
+    pub fn cross(&self, other: &Vector4f32) -> Vector4f32 {
+        let x = self.y * other.z - self.z * other.y;
+        let y = self.z * other.x - self.x * other.z;
+        let z = self.x * other.y - self.y * other.x;
+
+        Vector4f32::new(x, y, z, 0_f32)
+    }
+}
+
 struct Vertex {
     pos: Vector4f32,
     tex_coords: Vector4f32 //TODO(dustin): don't waste space here we only need 2 values
@@ -200,6 +243,238 @@ impl Edge {
         self.tex_coords_x += self.tex_coords_step_x;
         self.tex_coords_y += self.tex_coords_step_y;
         self.one_over_z += self.one_over_step_z;
+    }
+}
+
+struct IndexedModel {
+    pub positions: Vec<Vector4f32>,
+    pub tex_coords: Vec<Vector4f32>,
+    pub indices: Vec<i32>,
+    pub tangents: Vec<Vector4f32>,
+    pub normals: Vec<Vector4f32>
+}
+
+impl IndexedModel {
+
+    pub fn new() -> IndexedModel {
+        IndexedModel {
+            positions: Vec::new(),
+            tex_coords: Vec::new(),
+            indices: Vec::new(),
+            tangents: Vec::new(),
+            normals: Vec::new()
+        }
+    }
+
+    pub fn calc_tangents(&mut self) {
+        for idx in (0..self.indices.len()).step_by(3) {
+
+            let i0 = self.indices[idx as usize];
+            let i1 = self.indices[(idx + 1) as usize];
+            let i2 = self.indices[(idx + 2) as usize];
+
+            let edge1 = self.positions[i1 as usize].sub_v(&self.positions[i0 as usize]);
+            let edge2 = self.positions[i2 as usize].sub_v(&self.positions[i0 as usize]);
+
+            let delta_u1 = self.tex_coords[i1 as usize].x - self.tex_coords[i0 as usize].x;
+            let delta_v1 = self.tex_coords[i1 as usize].y - self.tex_coords[i0 as usize].y;
+            let delta_u2 = self.tex_coords[i2 as usize].x - self.tex_coords[i0 as usize].x;
+            let delta_v2 = self.tex_coords[i2 as usize].y - self.tex_coords[i0 as usize].y;
+
+            let divident = delta_u1 * delta_v2 - delta_u2 * delta_v1;
+            let f = if divident == 0_f32 { 0_f32 } else { 1_f32 / divident };
+
+            let x = f * (delta_v2 * edge1.x - delta_v1 * edge2.x);
+            let y = f * (delta_v2 * edge1.y - delta_v1 * edge2.y);
+            let z = f * (delta_v2 * edge1.z - delta_v1 * edge2.z);
+
+            let tangend = Vector4f32::new(x, y, z, 0_f32);
+        }
+
+        for idx in 0..self.normals.len() {
+            self.tangents[idx as usize] = self.tangents[idx as usize].normalized();
+        }
+    }
+
+    pub fn calc_normals(&mut self) {
+
+        for idx in (0..self.indices.len()).step_by(3) {
+
+            let i0 = self.indices[idx as usize];
+            let i1 = self.indices[(idx + 1) as usize];
+            let i2 = self.indices[(idx + 2) as usize];
+
+            let v1 = self.positions[i1 as usize].sub_v(&self.positions[i0 as usize]);
+            let v2 = self.positions[i2 as usize].sub_v(&self.positions[i0 as usize]);
+
+            let normal = v1.cross(&v2).normalized();
+
+            self.normals[i0 as usize] = self.normals[i0 as usize].add_v(&normal);
+            self.normals[i1 as usize] = self.normals[i1 as usize].add_v(&normal);
+            self.normals[i2 as usize] = self.normals[i2 as usize].add_v(&normal);
+        }
+
+        for idx in 0..self.normals.len() {
+            self.normals[idx as usize] = self.normals[idx as usize].normalized();
+        }
+    }
+}
+
+struct OBJIndex {
+    vertex_index: i32,
+    tex_coord_index: i32,
+    normal_index: i32
+}
+
+impl OBJIndex {
+
+    pub fn new() -> OBJIndex {
+        OBJIndex {
+            vertex_index: 0,
+            tex_coord_index: 0,
+            normal_index: 0
+        }
+    }
+}
+
+struct OBJModel {
+    pub positions: Vec<Vector4f32>,
+    pub tex_coords: Vec<Vector4f32>,
+    pub indices: Vec<OBJIndex>,
+    pub tangents: Vec<Vector4f32>,
+    pub normals: Vec<Vector4f32>,
+    pub has_tex_coords: bool,
+    pub has_normals: bool
+}
+
+impl OBJModel {
+
+    pub fn new() -> OBJModel {
+        OBJModel {
+            positions: Vec::new(),
+            tex_coords: Vec::new(),
+            indices: Vec::new(),
+            tangents: Vec::new(),
+            normals: Vec::new(),
+            has_tex_coords: false,
+            has_normals: false
+        }
+    }
+
+    pub fn init_from_path(&mut self, file_path: String) -> Result<OBJModel, String> {
+
+        let mut positions = Vec::new();
+        let mut tex_coords = Vec::new();
+        let mut indices = Vec::new();
+        let mut tangents = Vec::new();
+        let mut normals = Vec::new();
+        // let mut has_tex_coords = false;
+        // let mut has_normals = false;
+
+        let mut file = try!(File::open(&file_path).map_err(|err| format!("failed to open obj file: {}", err)));
+        let mut buffer = String::new();
+        try!(file.read_to_string(&mut buffer).map_err(|err| format!("failed to read obj file: {}", err)));
+
+        for line in buffer.lines() {
+
+            let tokens: Vec<&str> = line.split(" ").collect();
+
+            if tokens.len() == 0 || tokens[0] == "#" {
+                continue;
+
+            } else if tokens[0] == "v" {
+
+                let x: f32 = try!(tokens[1].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let y: f32 = try!(tokens[2].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let z: f32 = try!(tokens[3].parse().map_err(|err| format!("failed to parse token: {}", err)));
+
+                positions.push( Vector4f32::new(x, y, z, 1_f32));
+
+            } else if tokens[0] == "vt" {
+
+                let x: f32 = try!(tokens[1].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let y: f32 = try!(tokens[2].parse().map_err(|err| format!("failed to parse token: {}", err)));
+
+                tex_coords.push( Vector4f32::new(x, 1_f32 - y, 0_f32, 0_f32));
+
+            } else if tokens[0] == "vn" {
+
+                let x: f32 = try!(tokens[1].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let y: f32 = try!(tokens[2].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let z: f32 = try!(tokens[3].parse().map_err(|err| format!("failed to parse token: {}", err)));
+
+                normals.push( Vector4f32::new(x, y, z, 0_f32));
+
+            } else if tokens[0] == "f" {
+
+                for idx in 0..tokens.len() - 3 {
+
+                    indices.push(try!(self.parse_obj_index(tokens[1 as usize])));
+                    indices.push(try!(self.parse_obj_index(tokens[(2 + idx) as usize])));
+                    indices.push(try!(self.parse_obj_index(tokens[(3 + idx) as usize])));
+                }
+            }
+        }
+
+        let model = OBJModel {
+            positions: positions,
+            tex_coords: tex_coords,
+            indices: indices,
+            tangents: tangents,
+            normals: normals,
+            has_tex_coords: self.has_tex_coords,
+            has_normals: self.has_normals
+        };
+
+        Ok(model)
+    }
+
+    fn parse_obj_index(&mut self, token: &str) -> Result<OBJIndex, String> {
+
+        let values: Vec<&str> = token.split("/").collect();
+
+        let mut result = OBJIndex::new();
+        let vidx: i32 = try!(values[1 as usize].to_string().parse().map_err(|err| format!("failed to parse obj index vertex: {}", err)));
+        result.vertex_index = vidx - 1_i32;
+
+        if values.len() > 1 {
+
+            if !values[1].is_empty() {
+                self.has_tex_coords = true;
+                let tcidx: i32 = try!(values[1 as usize].to_string().parse().map_err(|err| format!("failed to parse obj index tex coord: {}", err)));
+                result.tex_coord_index = tcidx - 1_i32;
+            }
+
+            if values.len() > 2  {
+                self.has_normals = true;
+                let nidx: i32 = try!(values[2 as usize].to_string().parse().map_err(|err| format!("failed to parse obj index normal: {}", err)));
+                result.normal_index = nidx - 1_i32;
+            }
+
+        }
+
+        Ok(result)
+    }
+
+}
+
+struct Mesh {
+    vertices: Vec<Vertex>,
+    indices: Vec<i32>
+}
+
+impl Mesh {
+    pub fn from_path(file_path: String) -> Result<Mesh, String> {
+        let model = try!(OBJModel::new().init_from_path(file_path));
+
+        //TODO:(dustin) do stuff :)
+
+        let mesh = Mesh{
+            vertices: Vec::new(),
+            indices: Vec::new()
+        };
+
+        Ok(mesh)
     }
 }
 
@@ -500,6 +775,8 @@ fn main() {
 
     let image = Image::from_path(basepath.to_string() + "assets/img.png").unwrap();
     let texture = BitmapTexture::from_orbimage(&image);
+
+    let mesh = Mesh::from_path(basepath.to_string() + "assets/sphere.obj").unwrap();
 
     let mut rot_cnt = 0_f32;
 
