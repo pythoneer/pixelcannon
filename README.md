@@ -1,4 +1,4 @@
 # pixelcannon
 running on redox
 
-![pixelcannon](http://i.imgur.com/HuAFj15.gif)
+![pixelcannon](http://i.imgur.com/sMwkomc.gif)
