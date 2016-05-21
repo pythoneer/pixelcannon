@@ -12,6 +12,8 @@ use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 
+use std::collections::HashMap;
+
 struct Matrix4f32 {
     pub m: [[f32; 4]; 4]
 }
@@ -103,6 +105,7 @@ impl Matrix4f32 {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 struct Vector4f32 {
     x: f32,
     y: f32,
@@ -267,6 +270,7 @@ impl IndexedModel {
     }
 
     pub fn calc_tangents(&mut self) {
+        //TODO(dustin): use idiomatic iterators and combinators
         for idx in (0..self.indices.len()).step_by(3) {
 
             let i0 = self.indices[idx as usize];
@@ -291,6 +295,7 @@ impl IndexedModel {
             let tangend = Vector4f32::new(x, y, z, 0_f32);
         }
 
+        //TODO(dustin): use idiomatic iterators
         for idx in 0..self.normals.len() {
             self.tangents[idx as usize] = self.tangents[idx as usize].normalized();
         }
@@ -298,6 +303,7 @@ impl IndexedModel {
 
     pub fn calc_normals(&mut self) {
 
+        //TODO(dustin): use idiomatic iterators and combinators
         for idx in (0..self.indices.len()).step_by(3) {
 
             let i0 = self.indices[idx as usize];
@@ -314,12 +320,14 @@ impl IndexedModel {
             self.normals[i2 as usize] = self.normals[i2 as usize].add_v(&normal);
         }
 
+        //TODO(dustin): use idiomatic iterators
         for idx in 0..self.normals.len() {
             self.normals[idx as usize] = self.normals[idx as usize].normalized();
         }
     }
 }
 
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
 struct OBJIndex {
     vertex_index: i32,
     tex_coord_index: i32,
@@ -378,6 +386,7 @@ impl OBJModel {
         for line in buffer.lines() {
 
             let tokens: Vec<&str> = line.split(" ").collect();
+            //TODO(dustin): remove empty strings?
 
             if tokens.len() == 0 || tokens[0] == "#" {
                 continue;
@@ -407,7 +416,8 @@ impl OBJModel {
 
             } else if tokens[0] == "f" {
 
-                for idx in 0..tokens.len() - 3 {
+                //TODO(dustin): use idiomatic iterators
+                for idx in 0..(tokens.len() - 3) {
 
                     indices.push(try!(self.parse_obj_index(tokens[1 as usize])));
                     indices.push(try!(self.parse_obj_index(tokens[(2 + idx) as usize])));
@@ -434,7 +444,7 @@ impl OBJModel {
         let values: Vec<&str> = token.split("/").collect();
 
         let mut result = OBJIndex::new();
-        let vidx: i32 = try!(values[1 as usize].to_string().parse().map_err(|err| format!("failed to parse obj index vertex: {}", err)));
+        let vidx: i32 = try!(values[0 as usize].to_string().parse().map_err(|err| format!("failed to parse obj index vertex: {}", err)));
         result.vertex_index = vidx - 1_i32;
 
         if values.len() > 1 {
@@ -456,6 +466,103 @@ impl OBJModel {
         Ok(result)
     }
 
+    pub fn to_indexed_model(&self) -> IndexedModel {
+
+        let mut result = IndexedModel::new();
+        let mut normal_model = IndexedModel::new();
+
+        //TODO(dustin): explicit types
+        let mut result_index_map: HashMap<OBJIndex, i32> = HashMap::new();
+        let mut normal_index_map: HashMap<i32, i32> = HashMap::new();
+        let mut index_map: HashMap<i32, i32> = HashMap::new();
+
+        //TODO(dustin): use idiomatic iterators
+        for idx in 0..self.indices.len() {
+
+            let current_index = self.indices[idx as usize];  //NOTE(dustin): maybe as ref not copy see struct
+
+            let current_position = self.positions[current_index.vertex_index as usize]; //NOTE(dustin): maybe as ref not copy see struct
+            let current_tex_coord: Vector4f32;
+            let current_normal: Vector4f32;
+
+            if self.has_tex_coords {
+                current_tex_coord = self.tex_coords[current_index.tex_coord_index as usize]; //NOTE(dustin): maybe as ref not copy see struct
+            } else {
+                current_tex_coord = Vector4f32::new(0_f32, 0_f32, 0_f32, 0_f32);
+            }
+
+            if self.has_normals {
+                current_normal = self.normals[current_index.normal_index as usize]; //NOTE(dustin): maybe as ref not copy see struct
+            } else {
+                current_normal = Vector4f32::new(0_f32, 0_f32, 0_f32, 0_f32);
+            }
+
+            //TODO(dustin): fix this crappy unidiomatic code :(
+            let mut model_vertex_index = {
+                let opt_model_vertex_index = result_index_map.get(&current_index);
+
+                match opt_model_vertex_index {
+                    Some(x) => *x,
+                    None => -1_i32,
+                }
+            };
+            if model_vertex_index == -1_i32 {
+
+                model_vertex_index = result.positions.len() as i32;
+                result_index_map.insert(current_index, model_vertex_index);
+
+                result.positions.push(current_position);
+                result.tex_coords.push(current_tex_coord);
+                if self.has_normals {
+                    result.normals.push(current_normal);
+                }
+            }
+
+            //TODO(dustin): fix this crappy unidiomatic code :(
+            let mut normal_model_index = {
+                let opt_normal_model_index = normal_index_map.get(&current_index.vertex_index);
+
+                match opt_normal_model_index {
+                    Some(x) => *x,
+                    None => -1_i32,
+                }
+            };
+            if normal_model_index == -1_i32 {
+
+                normal_model_index = normal_model.positions.len() as i32;
+                normal_index_map.insert(current_index.vertex_index, normal_model_index);
+
+                normal_model.positions.push(current_position);
+                normal_model.tex_coords.push(current_tex_coord);
+                normal_model.normals.push(current_normal);
+                normal_model.tangents.push(Vector4f32::new(0_f32, 0_f32, 0_f32, 0_f32));
+            }
+
+            assert!(model_vertex_index != -1_i32);
+            assert!(normal_model_index != -1_i32);
+
+            result.indices.push(model_vertex_index);
+            normal_model.indices.push(normal_model_index);
+            index_map.insert(model_vertex_index, normal_model_index);
+        }
+
+        if !self.has_normals {
+            normal_model.calc_normals();
+            for idx in 0..result.positions.len() as i32 {
+                let normal_idx = *index_map.get(&idx).unwrap();
+                result.normals.push(normal_model.normals[normal_idx as usize]);
+            }
+        }
+
+        // normal_model.calc_tangents();
+        // for idx in 0..result.positions.len() as i32 {
+        //     let tan_idx = *index_map.get(&idx).unwrap();
+        //     result.tangents.push(normal_model.tangents[tan_idx as usize]);
+        // }
+
+        result
+    }
+
 }
 
 struct Mesh {
@@ -465,13 +572,16 @@ struct Mesh {
 
 impl Mesh {
     pub fn from_path(file_path: String) -> Result<Mesh, String> {
-        let model = try!(OBJModel::new().init_from_path(file_path));
+        let model = try!(OBJModel::new().init_from_path(file_path)).to_indexed_model();
 
-        //TODO:(dustin) do stuff :)
+        let mut vertices: Vec<Vertex> = Vec::new();
+        for idx in 0..model.positions.len() {
+            vertices.push(Vertex::new_with_pos_and_texcoords(model.positions[idx as usize], model.tex_coords[idx as usize]));
+        }
 
         let mesh = Mesh{
-            vertices: Vec::new(),
-            indices: Vec::new()
+            vertices: vertices,
+            indices: model.indices
         };
 
         Ok(mesh)
@@ -683,6 +793,10 @@ impl RenderContext {
         let mut mid_vert = v2.transform(&screen_space_transform).perspective_divide();
         let mut max_vert = v3.transform(&screen_space_transform).perspective_divide();
 
+        if min_vert.calc_double_area(&max_vert, &mid_vert) >= 0 {
+            return;
+        }
+
         if max_vert.pos.y < mid_vert.pos.y {
             std::mem::swap(&mut mid_vert, &mut max_vert);
         }
@@ -773,7 +887,7 @@ fn main() {
         basepath = "/apps/pixelcannon/";
     }
 
-    let image = Image::from_path(basepath.to_string() + "assets/img.png").unwrap();
+    let image = Image::from_path(basepath.to_string() + "assets/img2.png").unwrap();
     let texture = BitmapTexture::from_orbimage(&image);
 
     let mesh = Mesh::from_path(basepath.to_string() + "assets/sphere.obj").unwrap();
@@ -804,7 +918,15 @@ fn main() {
             // let transform = &projection.mul(&translation.mul(&rotation));
 
             render_context.clear();
-            render_context.draw_triangle(&min_vert.transform(&transform), &mid_vert.transform(&transform), &max_vert.transform(&transform), &texture);
+            // render_context.draw_triangle(&min_vert.transform(&transform), &mid_vert.transform(&transform), &max_vert.transform(&transform), &texture);
+            for idx in (0..mesh.indices.len()).step_by(3) {
+
+                let v1 = &mesh.vertices[mesh.indices[idx as usize] as usize].transform(&transform);
+                let v2 = &mesh.vertices[mesh.indices[(idx + 1) as usize] as usize].transform(&transform);
+                let v3 = &mesh.vertices[mesh.indices[(idx + 2) as usize] as usize].transform(&transform);
+
+                render_context.draw_triangle(v1, v2, v3, &texture);
+            }
             render_context.sync();
 
             frame_cnt += 1_f32;
