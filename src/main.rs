@@ -1,3 +1,5 @@
+#![feature(step_by)]
+
 extern crate orbclient;
 extern crate orbimage;
 
@@ -5,6 +7,12 @@ use orbclient::window::EventIter;
 use orbimage::Image;
 
 use std::time::Instant;
+
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+
+use std::collections::HashMap;
 
 struct Matrix4f32 {
     pub m: [[f32; 4]; 4]
@@ -97,11 +105,49 @@ impl Matrix4f32 {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 struct Vector4f32 {
     x: f32,
     y: f32,
     z: f32,
     w: f32
+}
+
+impl Vector4f32 {
+
+    pub fn new(x: f32, y: f32, z: f32, w: f32) -> Vector4f32 {
+        Vector4f32 {
+            x: x,
+            y: y,
+            z: z,
+            w: w
+        }
+    }
+
+    pub fn add_v(&self, other: &Vector4f32) -> Vector4f32 {
+        Vector4f32::new(self.x + other.x, self.y + other.y, self.z + other.z, self.w + other.w)
+    }
+
+    pub fn sub_v(&self, other: &Vector4f32) -> Vector4f32 {
+        Vector4f32::new(self.x - other.x, self.y - other.y, self.z - other.z, self.w - other.w)
+    }
+
+    pub fn length(&self) -> f32 {
+        ((self.x * self.x) + (self.y * self.y) + (self.z * self.z) + (self.w * self.w)).sqrt()
+    }
+
+    pub fn normalized(&self) -> Vector4f32 {
+        let length = self.length();
+        Vector4f32::new(self.x / length, self.y / length, self.z / length, self.w / length)
+    }
+
+    pub fn cross(&self, other: &Vector4f32) -> Vector4f32 {
+        let x = self.y * other.z - self.z * other.y;
+        let y = self.z * other.x - self.x * other.z;
+        let z = self.x * other.y - self.y * other.x;
+
+        Vector4f32::new(x, y, z, 0_f32)
+    }
 }
 
 struct Vertex {
@@ -200,6 +246,345 @@ impl Edge {
         self.tex_coords_x += self.tex_coords_step_x;
         self.tex_coords_y += self.tex_coords_step_y;
         self.one_over_z += self.one_over_step_z;
+    }
+}
+
+struct IndexedModel {
+    pub positions: Vec<Vector4f32>,
+    pub tex_coords: Vec<Vector4f32>,
+    pub indices: Vec<i32>,
+    pub tangents: Vec<Vector4f32>,
+    pub normals: Vec<Vector4f32>
+}
+
+impl IndexedModel {
+
+    pub fn new() -> IndexedModel {
+        IndexedModel {
+            positions: Vec::new(),
+            tex_coords: Vec::new(),
+            indices: Vec::new(),
+            tangents: Vec::new(),
+            normals: Vec::new()
+        }
+    }
+
+    pub fn calc_tangents(&mut self) {
+        //TODO(dustin): use idiomatic iterators and combinators
+        for idx in (0..self.indices.len()).step_by(3) {
+
+            let i0 = self.indices[idx as usize];
+            let i1 = self.indices[(idx + 1) as usize];
+            let i2 = self.indices[(idx + 2) as usize];
+
+            let edge1 = self.positions[i1 as usize].sub_v(&self.positions[i0 as usize]);
+            let edge2 = self.positions[i2 as usize].sub_v(&self.positions[i0 as usize]);
+
+            let delta_u1 = self.tex_coords[i1 as usize].x - self.tex_coords[i0 as usize].x;
+            let delta_v1 = self.tex_coords[i1 as usize].y - self.tex_coords[i0 as usize].y;
+            let delta_u2 = self.tex_coords[i2 as usize].x - self.tex_coords[i0 as usize].x;
+            let delta_v2 = self.tex_coords[i2 as usize].y - self.tex_coords[i0 as usize].y;
+
+            let divident = delta_u1 * delta_v2 - delta_u2 * delta_v1;
+            let f = if divident == 0_f32 { 0_f32 } else { 1_f32 / divident };
+
+            let x = f * (delta_v2 * edge1.x - delta_v1 * edge2.x);
+            let y = f * (delta_v2 * edge1.y - delta_v1 * edge2.y);
+            let z = f * (delta_v2 * edge1.z - delta_v1 * edge2.z);
+
+            let tangend = Vector4f32::new(x, y, z, 0_f32);
+        }
+
+        //TODO(dustin): use idiomatic iterators
+        for idx in 0..self.normals.len() {
+            self.tangents[idx as usize] = self.tangents[idx as usize].normalized();
+        }
+    }
+
+    pub fn calc_normals(&mut self) {
+
+        //TODO(dustin): use idiomatic iterators and combinators
+        for idx in (0..self.indices.len()).step_by(3) {
+
+            let i0 = self.indices[idx as usize];
+            let i1 = self.indices[(idx + 1) as usize];
+            let i2 = self.indices[(idx + 2) as usize];
+
+            let v1 = self.positions[i1 as usize].sub_v(&self.positions[i0 as usize]);
+            let v2 = self.positions[i2 as usize].sub_v(&self.positions[i0 as usize]);
+
+            let normal = v1.cross(&v2).normalized();
+
+            self.normals[i0 as usize] = self.normals[i0 as usize].add_v(&normal);
+            self.normals[i1 as usize] = self.normals[i1 as usize].add_v(&normal);
+            self.normals[i2 as usize] = self.normals[i2 as usize].add_v(&normal);
+        }
+
+        //TODO(dustin): use idiomatic iterators
+        for idx in 0..self.normals.len() {
+            self.normals[idx as usize] = self.normals[idx as usize].normalized();
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
+struct OBJIndex {
+    vertex_index: i32,
+    tex_coord_index: i32,
+    normal_index: i32
+}
+
+impl OBJIndex {
+
+    pub fn new() -> OBJIndex {
+        OBJIndex {
+            vertex_index: 0,
+            tex_coord_index: 0,
+            normal_index: 0
+        }
+    }
+}
+
+struct OBJModel {
+    pub positions: Vec<Vector4f32>,
+    pub tex_coords: Vec<Vector4f32>,
+    pub indices: Vec<OBJIndex>,
+    pub tangents: Vec<Vector4f32>,
+    pub normals: Vec<Vector4f32>,
+    pub has_tex_coords: bool,
+    pub has_normals: bool
+}
+
+impl OBJModel {
+
+    pub fn new() -> OBJModel {
+        OBJModel {
+            positions: Vec::new(),
+            tex_coords: Vec::new(),
+            indices: Vec::new(),
+            tangents: Vec::new(),
+            normals: Vec::new(),
+            has_tex_coords: false,
+            has_normals: false
+        }
+    }
+
+    pub fn init_from_path(&mut self, file_path: String) -> Result<OBJModel, String> {
+
+        let mut positions = Vec::new();
+        let mut tex_coords = Vec::new();
+        let mut indices = Vec::new();
+        let mut tangents = Vec::new();
+        let mut normals = Vec::new();
+        // let mut has_tex_coords = false;
+        // let mut has_normals = false;
+
+        let mut file = try!(File::open(&file_path).map_err(|err| format!("failed to open obj file: {}", err)));
+        let mut buffer = String::new();
+        try!(file.read_to_string(&mut buffer).map_err(|err| format!("failed to read obj file: {}", err)));
+
+        for line in buffer.lines() {
+
+            let tokens: Vec<&str> = line.split(" ").collect();
+            //TODO(dustin): remove empty strings?
+
+            if tokens.len() == 0 || tokens[0] == "#" {
+                continue;
+
+            } else if tokens[0] == "v" {
+
+                let x: f32 = try!(tokens[1].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let y: f32 = try!(tokens[2].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let z: f32 = try!(tokens[3].parse().map_err(|err| format!("failed to parse token: {}", err)));
+
+                positions.push( Vector4f32::new(x, y, z, 1_f32));
+
+            } else if tokens[0] == "vt" {
+
+                let x: f32 = try!(tokens[1].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let y: f32 = try!(tokens[2].parse().map_err(|err| format!("failed to parse token: {}", err)));
+
+                tex_coords.push( Vector4f32::new(x, 1_f32 - y, 0_f32, 0_f32));
+
+            } else if tokens[0] == "vn" {
+
+                let x: f32 = try!(tokens[1].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let y: f32 = try!(tokens[2].parse().map_err(|err| format!("failed to parse token: {}", err)));
+                let z: f32 = try!(tokens[3].parse().map_err(|err| format!("failed to parse token: {}", err)));
+
+                normals.push( Vector4f32::new(x, y, z, 0_f32));
+
+            } else if tokens[0] == "f" {
+
+                //TODO(dustin): use idiomatic iterators
+                for idx in 0..(tokens.len() - 3) {
+
+                    indices.push(try!(self.parse_obj_index(tokens[1 as usize])));
+                    indices.push(try!(self.parse_obj_index(tokens[(2 + idx) as usize])));
+                    indices.push(try!(self.parse_obj_index(tokens[(3 + idx) as usize])));
+                }
+            }
+        }
+
+        let model = OBJModel {
+            positions: positions,
+            tex_coords: tex_coords,
+            indices: indices,
+            tangents: tangents,
+            normals: normals,
+            has_tex_coords: self.has_tex_coords,
+            has_normals: self.has_normals
+        };
+
+        Ok(model)
+    }
+
+    fn parse_obj_index(&mut self, token: &str) -> Result<OBJIndex, String> {
+
+        let values: Vec<&str> = token.split("/").collect();
+
+        let mut result = OBJIndex::new();
+        let vidx: i32 = try!(values[0 as usize].to_string().parse().map_err(|err| format!("failed to parse obj index vertex: {}", err)));
+        result.vertex_index = vidx - 1_i32;
+
+        if values.len() > 1 {
+
+            if !values[1].is_empty() {
+                self.has_tex_coords = true;
+                let tcidx: i32 = try!(values[1 as usize].to_string().parse().map_err(|err| format!("failed to parse obj index tex coord: {}", err)));
+                result.tex_coord_index = tcidx - 1_i32;
+            }
+
+            if values.len() > 2  {
+                self.has_normals = true;
+                let nidx: i32 = try!(values[2 as usize].to_string().parse().map_err(|err| format!("failed to parse obj index normal: {}", err)));
+                result.normal_index = nidx - 1_i32;
+            }
+
+        }
+
+        Ok(result)
+    }
+
+    pub fn to_indexed_model(&self) -> IndexedModel {
+
+        let mut result = IndexedModel::new();
+        let mut normal_model = IndexedModel::new();
+
+        //TODO(dustin): explicit types
+        let mut result_index_map: HashMap<OBJIndex, i32> = HashMap::new();
+        let mut normal_index_map: HashMap<i32, i32> = HashMap::new();
+        let mut index_map: HashMap<i32, i32> = HashMap::new();
+
+        //TODO(dustin): use idiomatic iterators
+        for idx in 0..self.indices.len() {
+
+            let current_index = self.indices[idx as usize];  //NOTE(dustin): maybe as ref not copy see struct
+
+            let current_position = self.positions[current_index.vertex_index as usize]; //NOTE(dustin): maybe as ref not copy see struct
+            let current_tex_coord: Vector4f32;
+            let current_normal: Vector4f32;
+
+            if self.has_tex_coords {
+                current_tex_coord = self.tex_coords[current_index.tex_coord_index as usize]; //NOTE(dustin): maybe as ref not copy see struct
+            } else {
+                current_tex_coord = Vector4f32::new(0_f32, 0_f32, 0_f32, 0_f32);
+            }
+
+            if self.has_normals {
+                current_normal = self.normals[current_index.normal_index as usize]; //NOTE(dustin): maybe as ref not copy see struct
+            } else {
+                current_normal = Vector4f32::new(0_f32, 0_f32, 0_f32, 0_f32);
+            }
+
+            //TODO(dustin): fix this crappy unidiomatic code :(
+            let mut model_vertex_index = {
+                let opt_model_vertex_index = result_index_map.get(&current_index);
+
+                match opt_model_vertex_index {
+                    Some(x) => *x,
+                    None => -1_i32,
+                }
+            };
+            if model_vertex_index == -1_i32 {
+
+                model_vertex_index = result.positions.len() as i32;
+                result_index_map.insert(current_index, model_vertex_index);
+
+                result.positions.push(current_position);
+                result.tex_coords.push(current_tex_coord);
+                if self.has_normals {
+                    result.normals.push(current_normal);
+                }
+            }
+
+            //TODO(dustin): fix this crappy unidiomatic code :(
+            let mut normal_model_index = {
+                let opt_normal_model_index = normal_index_map.get(&current_index.vertex_index);
+
+                match opt_normal_model_index {
+                    Some(x) => *x,
+                    None => -1_i32,
+                }
+            };
+            if normal_model_index == -1_i32 {
+
+                normal_model_index = normal_model.positions.len() as i32;
+                normal_index_map.insert(current_index.vertex_index, normal_model_index);
+
+                normal_model.positions.push(current_position);
+                normal_model.tex_coords.push(current_tex_coord);
+                normal_model.normals.push(current_normal);
+                normal_model.tangents.push(Vector4f32::new(0_f32, 0_f32, 0_f32, 0_f32));
+            }
+
+            assert!(model_vertex_index != -1_i32);
+            assert!(normal_model_index != -1_i32);
+
+            result.indices.push(model_vertex_index);
+            normal_model.indices.push(normal_model_index);
+            index_map.insert(model_vertex_index, normal_model_index);
+        }
+
+        if !self.has_normals {
+            normal_model.calc_normals();
+            for idx in 0..result.positions.len() as i32 {
+                let normal_idx = *index_map.get(&idx).unwrap();
+                result.normals.push(normal_model.normals[normal_idx as usize]);
+            }
+        }
+
+        // normal_model.calc_tangents();
+        // for idx in 0..result.positions.len() as i32 {
+        //     let tan_idx = *index_map.get(&idx).unwrap();
+        //     result.tangents.push(normal_model.tangents[tan_idx as usize]);
+        // }
+
+        result
+    }
+
+}
+
+struct Mesh {
+    vertices: Vec<Vertex>,
+    indices: Vec<i32>
+}
+
+impl Mesh {
+    pub fn from_path(file_path: String) -> Result<Mesh, String> {
+        let model = try!(OBJModel::new().init_from_path(file_path)).to_indexed_model();
+
+        let mut vertices: Vec<Vertex> = Vec::new();
+        for idx in 0..model.positions.len() {
+            vertices.push(Vertex::new_with_pos_and_texcoords(model.positions[idx as usize], model.tex_coords[idx as usize]));
+        }
+
+        let mesh = Mesh{
+            vertices: vertices,
+            indices: model.indices
+        };
+
+        Ok(mesh)
     }
 }
 
@@ -399,6 +784,16 @@ impl RenderContext {
         self.window.sync();
     }
 
+    pub fn draw_mesh(&mut self, mesh: &Mesh, transform: &Matrix4f32, texture: &BitmapTexture) {
+        for idx in (0..mesh.indices.len()).step_by(3) {
+            let v1 = &mesh.vertices[mesh.indices[idx as usize] as usize].transform(&transform);
+            let v2 = &mesh.vertices[mesh.indices[(idx + 1) as usize] as usize].transform(&transform);
+            let v3 = &mesh.vertices[mesh.indices[(idx + 2) as usize] as usize].transform(&transform);
+
+            self.draw_triangle(v1, v2, v3, &texture);
+        }
+    }
+
     pub fn draw_triangle(&mut self, v1: &Vertex, v2: &Vertex, v3: &Vertex, texture: &BitmapTexture) {
 
         //TODO(dustin): optimisation do not calculate/init every time
@@ -407,6 +802,10 @@ impl RenderContext {
         let mut min_vert = v1.transform(&screen_space_transform).perspective_divide();
         let mut mid_vert = v2.transform(&screen_space_transform).perspective_divide();
         let mut max_vert = v3.transform(&screen_space_transform).perspective_divide();
+
+        if min_vert.calc_double_area(&max_vert, &mid_vert) >= 0 {
+            return;
+        }
 
         if max_vert.pos.y < mid_vert.pos.y {
             std::mem::swap(&mut mid_vert, &mut max_vert);
@@ -508,8 +907,10 @@ fn main() {
         basepath = "/apps/pixelcannon/";
     }
 
-    let image = Image::from_path(basepath.to_string() + "assets/img.png").unwrap();
+    let image = Image::from_path(basepath.to_string() + "assets/img2.png").unwrap();
     let texture = BitmapTexture::from_orbimage(&image);
+
+    let mesh = Mesh::from_path(basepath.to_string() + "assets/sphere.obj").unwrap();
 
     let mut rot_cnt = 0_f32;
 
@@ -537,9 +938,7 @@ fn main() {
             // let transform = &projection.mul(&translation.mul(&rotation));
 
             render_context.clear();
-            for &(ref min_vert, ref mid_vert, ref max_vert) in triangles.iter() {
-                render_context.draw_triangle(&min_vert.transform(&transform), &mid_vert.transform(&transform), &max_vert.transform(&transform), &texture);
-            }
+            render_context.draw_mesh(&mesh, &transform, &texture);
             render_context.sync();
 
             frame_cnt += 1_f32;
