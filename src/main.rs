@@ -10,7 +10,6 @@ use std::time::Instant;
 
 use std::fs::File;
 use std::io::Read;
-use std::path::Path;
 
 use std::collections::HashMap;
 
@@ -755,7 +754,7 @@ impl BitmapTexture {
 }
 
 struct RenderContext {
-    window: Box<orbclient::Window>,
+    window: orbclient::Window,
 }
 
 impl RenderContext {
