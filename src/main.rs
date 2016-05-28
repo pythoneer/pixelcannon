@@ -1,5 +1,9 @@
 #![feature(step_by)]
-
+#![feature(plugin)]
+// #![plugin(flamer)]
+// #![flame]
+//
+// extern crate flame;
 extern crate orbclient;
 extern crate orbimage;
 
@@ -197,7 +201,9 @@ struct Edge {
     tex_coords_y: f32,
     tex_coords_step_y: f32,
     one_over_z: f32,
-    one_over_step_z: f32
+    one_over_step_z: f32,
+    depth: f32,
+    depth_step: f32,
 }
 
 impl Edge {
@@ -225,6 +231,10 @@ impl Edge {
             interpolator.one_over_step_zy * prestep_y;
         let _one_over_step_z = interpolator.one_over_step_zy + interpolator.one_over_step_zx * _step_x;
 
+        let _depth = interpolator.depth[min_y_vert_index as usize] +
+            interpolator.depth_step_x * prestep_x +
+            interpolator.depth_step_y * prestep_y;
+        let _depth_step = interpolator.depth_step_y + interpolator.depth_step_x * _step_x;
 
         Edge {
             pos_x: _pos_x,
@@ -237,7 +247,9 @@ impl Edge {
             tex_coords_y: _tex_coord_y,
             tex_coords_step_y: _tex_coord_step_y,
             one_over_z: _one_over_z,
-            one_over_step_z: _one_over_step_z
+            one_over_step_z: _one_over_step_z,
+            depth: _depth,
+            depth_step: _depth_step,
         }
     }
 
@@ -246,6 +258,7 @@ impl Edge {
         self.tex_coords_x += self.tex_coords_step_x;
         self.tex_coords_y += self.tex_coords_step_y;
         self.one_over_z += self.one_over_step_z;
+        self.depth += self.depth_step;
     }
 }
 
@@ -592,6 +605,7 @@ struct Interpolator {
     tex_coords_x: [f32; 3],
     tex_coords_y: [f32; 3],
     one_over_z: [f32; 3],
+    depth: [f32; 3],
 
     tex_coords_step_xx: f32,
     tex_coords_step_xy: f32,
@@ -599,7 +613,10 @@ struct Interpolator {
     tex_coords_step_yy: f32,
 
     one_over_step_zx: f32,
-    one_over_step_zy: f32
+    one_over_step_zy: f32,
+
+    depth_step_x: f32,
+    depth_step_y: f32,
 }
 
 impl Interpolator {
@@ -616,6 +633,7 @@ impl Interpolator {
         let mut _one_over_z = [0f32; 3];
         let mut _tex_coords_x = [0f32; 3];
         let mut _tex_coords_y = [0f32; 3];
+        let mut _depth = [0f32; 3];
 
         let mut _tex_coords_step_xx = 0f32;
         let mut _tex_coords_step_xy = 0f32;
@@ -624,6 +642,9 @@ impl Interpolator {
 
         let mut _one_over_step_zx = 0f32;
         let mut _one_over_step_zy = 0f32;
+
+        let mut _depth_step_x = 0f32;
+        let mut _depth_step_y = 0f32;
 
         _one_over_z[0] = 1.0f32/min_vert.pos.w;
         _one_over_z[1] = 1.0f32/mid_vert.pos.w;
@@ -637,6 +658,10 @@ impl Interpolator {
         _tex_coords_y[1] = mid_vert.tex_coords.y * _one_over_z[1];
         _tex_coords_y[2] = max_vert.tex_coords.y * _one_over_z[2];
 
+        _depth[0] = min_vert.pos.z;
+        _depth[1] = mid_vert.pos.z;
+        _depth[2] = max_vert.pos.z;
+
         _tex_coords_step_xx = Interpolator::calc_step_x(_tex_coords_x, min_vert, mid_vert, max_vert, one_over_dx);
         _tex_coords_step_xy = Interpolator::calc_step_y(_tex_coords_x, min_vert, mid_vert, max_vert, one_over_dy);
         _tex_coords_step_yx = Interpolator::calc_step_x(_tex_coords_y, min_vert, mid_vert, max_vert, one_over_dx);
@@ -648,6 +673,7 @@ impl Interpolator {
             tex_coords_x: _tex_coords_x,
             tex_coords_y: _tex_coords_y,
             one_over_z: _one_over_z,
+            depth: _depth,
 
             tex_coords_step_xx: _tex_coords_step_xx,
             tex_coords_step_xy: _tex_coords_step_xy,
@@ -655,7 +681,10 @@ impl Interpolator {
             tex_coords_step_yy: _tex_coords_step_yy,
 
             one_over_step_zx: _one_over_step_zx,
-            one_over_step_zy: _one_over_step_zy
+            one_over_step_zy: _one_over_step_zy,
+
+            depth_step_x: _depth_step_x,
+            depth_step_y: _depth_step_y,
         }
     }
 
@@ -756,12 +785,13 @@ impl BitmapTexture {
 
 struct RenderContext {
     window: Box<orbclient::Window>,
+    zbuffer: Vec<f32>,
 }
 
 impl RenderContext {
     pub fn new(width: u32, height: u32, title: &str) -> RenderContext {
         let orb_window = orbclient::Window::new_flags(100, 100, width, height, title, true).unwrap();
-        RenderContext{window: orb_window}
+        RenderContext{window: orb_window, zbuffer: vec![std::f32::MAX; (width * height) as usize] }
     }
 
     pub fn get_height(&self) -> u32 {
@@ -784,6 +814,11 @@ impl RenderContext {
         self.window.sync();
     }
 
+    pub fn clea_zbuffer(&mut self) {
+        self.zbuffer = vec![std::f32::MAX; (self.get_width() * self.get_height()) as usize];
+    }
+
+    // #[flame]
     pub fn draw_mesh(&mut self, mesh: &Mesh, transform: &Matrix4f32, texture: &BitmapTexture) {
         for idx in (0..mesh.indices.len()).step_by(3) {
             let v1 = &mesh.vertices[mesh.indices[idx as usize] as usize].transform(&transform);
@@ -794,6 +829,7 @@ impl RenderContext {
         }
     }
 
+    // #[flame]
     pub fn draw_triangle(&mut self, v1: &Vertex, v2: &Vertex, v3: &Vertex, texture: &BitmapTexture) {
 
         //TODO(dustin): optimisation do not calculate/init every time
@@ -822,6 +858,7 @@ impl RenderContext {
         self.scan_triangle(&min_vert, &mid_vert, &max_vert, min_vert.calc_double_area(&max_vert, &mid_vert) >= 0, texture);
     }
 
+    // #[flame]
     fn scan_triangle(&mut self,  min_vert: &Vertex, mid_vert: &Vertex, max_vert: &Vertex, side: bool, texture: &BitmapTexture) {
 
         let interpolator = Interpolator::new(min_vert, mid_vert, max_vert);
@@ -833,6 +870,7 @@ impl RenderContext {
         self.scan_edges(&mut top_to_bottom, &mut middle_to_bottom, side, texture);
     }
 
+    // #[flame]
     fn scan_edges(&mut self, first: &mut Edge, second: &mut Edge, side: bool, texture: &BitmapTexture) {
 
         let start_y = second.start_y;
@@ -852,6 +890,7 @@ impl RenderContext {
         }
     }
 
+    // #[flame]
     fn draw_scan_line(&mut self, left: &Edge, right: &Edge, idx_y: i32, texture: &BitmapTexture) {
 
         let min_x = left.pos_x.ceil() as i32;
@@ -862,25 +901,36 @@ impl RenderContext {
         let tex_coords_step_xx = (right.tex_coords_x - left.tex_coords_x) / dist_x;
         let tex_coords_step_yx = (right.tex_coords_y - left.tex_coords_y) / dist_x;
         let one_over_step_zx = (right.one_over_z - left.one_over_z) / dist_x;
+        let depth_step_x = (right.depth - left.depth) / dist_x;
 
         let mut tex_coords_x = left.tex_coords_x + tex_coords_step_xx * prestep_x;
         let mut tex_coords_y = left.tex_coords_y + tex_coords_step_yx * prestep_x;
         let mut one_over_z = left.one_over_z + one_over_step_zx * prestep_x;
+        let mut depth = left.depth + depth_step_x * prestep_x;
 
         for idx_x in min_x..max_x {
-            let z = 1_f32 / one_over_z;
-            let src_x = ((tex_coords_x * z) * (texture.width - 1) as f32 + 0.5_f32) as i32;
-            let src_y = ((tex_coords_y * z) * (texture.height - 1) as f32 + 0.5_f32) as i32;
 
-            self.window.pixel(idx_x, idx_y, texture.get_orb_pixel(src_x, src_y));
+            let zbuffer_idx = (idx_x + idx_y * self.get_width() as i32) as usize;
+            if depth < self.zbuffer[zbuffer_idx] {
+
+                self.zbuffer[zbuffer_idx] = depth;
+
+                let z = 1_f32 / one_over_z;
+                let src_x = ((tex_coords_x * z) * (texture.width - 1) as f32 + 0.5_f32) as i32;
+                let src_y = ((tex_coords_y * z) * (texture.height - 1) as f32 + 0.5_f32) as i32;
+
+                self.window.pixel(idx_x, idx_y, texture.get_orb_pixel(src_x, src_y));
+            }
 
             one_over_z += one_over_step_zx;
             tex_coords_x += tex_coords_step_xx;
             tex_coords_y += tex_coords_step_yx;
+            depth += depth_step_x;
         }
     }
 }
 
+// #[flame]
 fn main() {
 
     let mut render_context = RenderContext::new(500, 400, "pixelcannon");
@@ -910,7 +960,7 @@ fn main() {
     let image = Image::from_path(basepath.to_string() + "assets/img2.png").unwrap();
     let texture = BitmapTexture::from_orbimage(&image);
 
-    let mesh = Mesh::from_path(basepath.to_string() + "assets/sphere.obj").unwrap();
+    let mesh = Mesh::from_path(basepath.to_string() + "assets/monkey0.obj").unwrap();
 
     let mut rot_cnt = 0_f32;
 
@@ -938,6 +988,7 @@ fn main() {
             // let transform = &projection.mul(&translation.mul(&rotation));
 
             render_context.clear();
+            render_context.clea_zbuffer();
             render_context.draw_mesh(&mesh, &transform, &texture);
             render_context.sync();
 
@@ -953,11 +1004,17 @@ fn main() {
         }
 
         for orbital_event in render_context.events() {
-            match orbital_event.to_option() {
-                orbclient::EventOption::Quit(_quit_event) => break 'event,
+            use orbclient::event::EventOption;
+            let ev_opt = orbital_event.to_option();
+
+            match ev_opt {
+                EventOption::Quit(..) => break 'event,
                 _ => (),
             };
         }
 
     }
+
+    // Dump the report to disk
+    // flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
 }
