@@ -1,11 +1,15 @@
 #![feature(step_by)]
 #![feature(plugin)]
+#![feature(core_intrinsics)]
 // #![plugin(flamer)]
 // #![flame]
 //
 // extern crate flame;
 extern crate orbclient;
 extern crate orbimage;
+
+extern crate core;
+// extern crate simple_parallel;
 
 use orbclient::window::EventIter;
 use orbimage::Image;
@@ -17,6 +21,8 @@ use std::io::Read;
 use std::path::Path;
 
 use std::collections::HashMap;
+
+// let mut pool = simple_parallel::Pool::new(4);
 
 struct Matrix4f32 {
     pub m: [[f32; 4]; 4]
@@ -814,8 +820,32 @@ impl RenderContext {
         self.window.sync();
     }
 
-    pub fn clea_zbuffer(&mut self) {
-        self.zbuffer = vec![std::f32::MAX; (self.get_width() * self.get_height()) as usize];
+    pub fn clear_zbuffer(&mut self) {
+
+        for zb in self.zbuffer.iter_mut() {
+            *zb = std::f32::MAX;
+        }
+
+        // pool.for_(data.chunks_mut(100), |target| {
+        //     // do stuff with `target`
+        //     target = std::f32::MAX;
+        // })
+
+        // let backing = self.zbuffer.as_mut_ptr();
+        // for i in 0..(self.zbuffer.len() as isize){
+        //     unsafe{
+        //         core::ptr::write(backing.offset(i), std::f32::MAX);
+        //     }
+        // }
+
+        // let size = self.zbuffer.len(); //* std::mem::size_of::<f32>();
+        // unsafe {
+        //     std::intrinsics::volatile_set_memory::<Vec<f32>>(self.zbuffer , 0, size);
+        // }
+
+        // let len = self.zbuffer.len();
+        // self.zbuffer = Vec::with_capacity(len);
+        // unsafe { self.zbuffer.set_len(len);};
     }
 
     // #[flame]
@@ -988,8 +1018,9 @@ fn main() {
             // let transform = &projection.mul(&translation.mul(&rotation));
 
             render_context.clear();
-            render_context.clea_zbuffer();
+            render_context.clear_zbuffer();
             render_context.draw_mesh(&mesh, &transform, &texture);
+
             render_context.sync();
 
             frame_cnt += 1_f32;
