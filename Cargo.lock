@@ -2,7 +2,7 @@
 name = "renderer"
 version = "0.1.0"
 dependencies = [
- "orbclient 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "orbclient 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "orbimage 0.1.1 (git+https://github.com/redox-os/orbimage.git)",
 ]
 
@@ -104,7 +104,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
 name = "orbclient"
-version = "0.1.12"
+version = "0.1.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "sdl2 0.9.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -115,7 +115,7 @@ name = "orbimage"
 version = "0.1.1"
 source = "git+https://github.com/redox-os/orbimage.git#fa376c5cad1482b893bd7311b5af4c095c746f08"
 dependencies = [
- "orbclient 0.1.12 (registry+https://github.com/rust-lang/crates.io-index)",
+ "orbclient 0.1.13 (registry+https://github.com/rust-lang/crates.io-index)",
  "png 0.1.0 (git+https://github.com/servo/rust-png.git)",
 ]
 

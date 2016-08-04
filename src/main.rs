@@ -4,7 +4,7 @@ extern crate orbclient;
 extern crate orbimage;
 
 use orbclient::EventOption;
-use orbclient::window::EventIter;
+use orbclient::EventIter;
 use orbimage::Image;
 
 use std::collections::HashMap;
