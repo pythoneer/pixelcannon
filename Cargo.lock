@@ -1,5 +1,5 @@
 [root]
-name = "renderer"
+name = "pixelcannon"
 version = "0.1.0"
 dependencies = [
  "orbclient 0.1.19 (registry+https://github.com/rust-lang/crates.io-index)",
