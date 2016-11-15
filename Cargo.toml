@@ -1,5 +1,5 @@
 [package]
-name = "renderer"
+name = "pixelcannon"
 version = "0.1.0"
 authors = ["Dustin Bensing <dustin.bensing@googlemail.com>"]
 
