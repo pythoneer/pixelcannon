@@ -1,0 +1,5 @@
+name=pixelcannon
+binary=/bin/pixelcannon
+icon=/ui/icons/apps/preferences-desktop-gaming.png
+author=Dustin Bensing
+description=3D Renderer
