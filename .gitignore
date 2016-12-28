@@ -1,5 +1,6 @@
 Cargo.lock
 target
 .idea/*
+.vscode/*
 renderer.iml
 out/*
