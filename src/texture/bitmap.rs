@@ -1,5 +1,5 @@
-use orbclient;
 use orbimage::Image;
+use orbclient::{self, Renderer};
 
 //NOTE(dustin): format ARGB
 pub struct BitmapTexture {

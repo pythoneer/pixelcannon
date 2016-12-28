@@ -1,4 +1,4 @@
-use orbclient::{self, EventIter};
+use orbclient::{self, EventIter, Renderer};
 use std;
 
 use interpolate::Interpolator;
