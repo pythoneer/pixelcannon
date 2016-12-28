@@ -121,12 +121,25 @@ impl RenderContext {
         let mut tex_coords_y = left.tex_coords_y + tex_coords_step_yx * prestep_x;
         let mut one_over_z = left.one_over_z + one_over_step_zx * prestep_x;
 
+        let ww = self.window.width();
+        let wh = self.window.height();
+        let data = self.window.data_mut();
+
         for idx_x in min_x..max_x {
+
+            let data_idx = idx_y * ww as i32 + idx_x;
+            if data_idx >= data.len() as i32 || data_idx < 0 {
+                break;
+            }
+
             let z = 1_f32 / one_over_z;
             let src_x = ((tex_coords_x * z) * (texture.width - 1) as f32 + 0.5_f32) as i32;
             let src_y = ((tex_coords_y * z) * (texture.height - 1) as f32 + 0.5_f32) as i32;
 
-            self.window.pixel(idx_x, idx_y, texture.get_orb_pixel(src_x, src_y));
+//            self.window.pixel(idx_x, idx_y, texture.get_orb_pixel(src_x, src_y));
+            let new = texture.get_orb_pixel(src_x, src_y).data;
+            let old = &mut data[idx_y as usize * ww as usize + idx_x as usize].data;
+            *old = new;
 
             one_over_z += one_over_step_zx;
             tex_coords_x += tex_coords_step_xx;
