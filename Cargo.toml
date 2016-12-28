@@ -7,5 +7,5 @@ authors = ["Dustin Bensing <dustin.bensing@googlemail.com>"]
 orbclient = "*"
 orbimage = { git = "https://github.com/redox-os/orbimage.git" }
 
-[profile.release]
-debug = true
+#[profile.release]
+#debug = true
